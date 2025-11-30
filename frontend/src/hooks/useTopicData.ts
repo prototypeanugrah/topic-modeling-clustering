@@ -1,67 +1,103 @@
-import { useState, useEffect } from "react";
-import { api } from "../api/client";
+import useSWR, { preload } from "swr";
+import { useEffect } from "react";
+import { swrFetcher, prefetch } from "../api/client";
 import type {
   CoherenceResponse,
   TopicWordsResponse,
   ClusterMetricsResponse,
 } from "../types/api";
 
+// SWR configuration for optimal caching
+const swrConfig = {
+  revalidateOnFocus: false,      // Don't refetch when window regains focus
+  revalidateOnReconnect: false,  // Don't refetch on network reconnect
+  dedupingInterval: 60000,       // Dedupe requests within 60 seconds
+  keepPreviousData: true,        // Show stale data while fetching new data
+};
+
 export function useCoherence() {
-  const [data, setData] = useState<CoherenceResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, error, isLoading, isValidating } = useSWR<CoherenceResponse>(
+    "/topics/coherence",
+    swrFetcher,
+    {
+      ...swrConfig,
+      revalidateIfStale: false,  // Coherence data doesn't change
+    }
+  );
 
-  useEffect(() => {
-    console.log("Fetching coherence...");
-    api
-      .getCoherence()
-      .then((result) => {
-        console.log("Coherence result:", result);
-        setData(result);
-      })
-      .catch((err) => {
-        console.error("Coherence error:", err);
-        setError(err.message);
-      })
-      .finally(() => {
-        console.log("Coherence loading complete");
-        setLoading(false);
-      });
-  }, []);
-
-  return { data, loading, error };
+  return {
+    data: data ?? null,
+    loading: isLoading,
+    isValidating,
+    error: error?.message ?? null,
+  };
 }
 
 export function useTopicWords(nTopics: number, numWords: number = 10) {
-  const [data, setData] = useState<TopicWordsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, error, isLoading, isValidating } = useSWR<TopicWordsResponse>(
+    `/topics/${nTopics}/words?num_words=${numWords}`,
+    swrFetcher,
+    {
+      ...swrConfig,
+      revalidateIfStale: false,  // Topic words don't change for same k
+    }
+  );
 
+  // Prefetch adjacent topic counts in the background
   useEffect(() => {
-    setLoading(true);
-    api
-      .getTopicWords(nTopics, numWords)
-      .then(setData)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    // Small delay to let current request complete first
+    const timer = setTimeout(() => {
+      // Prefetch k-1 and k+1
+      if (nTopics > 2) {
+        prefetch(`/topics/${nTopics - 1}/words?num_words=${numWords}`);
+      }
+      if (nTopics < 20) {
+        prefetch(`/topics/${nTopics + 1}/words?num_words=${numWords}`);
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [nTopics, numWords]);
 
-  return { data, loading, error };
+  return {
+    data: data ?? null,
+    loading: isLoading,
+    isValidating,
+    error: error?.message ?? null,
+  };
 }
 
 export function useClusterMetrics(nTopics: number) {
-  const [data, setData] = useState<ClusterMetricsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, error, isLoading, isValidating } = useSWR<ClusterMetricsResponse>(
+    `/clustering/metrics/${nTopics}`,
+    swrFetcher,
+    swrConfig
+  );
 
+  // Prefetch adjacent topic counts
   useEffect(() => {
-    setLoading(true);
-    api
-      .getClusterMetrics(nTopics)
-      .then(setData)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    const timer = setTimeout(() => {
+      if (nTopics > 2) {
+        prefetch(`/clustering/metrics/${nTopics - 1}`);
+      }
+      if (nTopics < 20) {
+        prefetch(`/clustering/metrics/${nTopics + 1}`);
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [nTopics]);
 
-  return { data, loading, error };
+  return {
+    data: data ?? null,
+    loading: isLoading,
+    isValidating,
+    error: error?.message ?? null,
+  };
+}
+
+// Preload function for warming the cache
+export function preloadTopicData(nTopics: number, numWords: number = 10) {
+  preload(`/topics/${nTopics}/words?num_words=${numWords}`, swrFetcher);
+  preload(`/clustering/metrics/${nTopics}`, swrFetcher);
 }

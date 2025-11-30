@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from backend.api.routes import api_router
 from backend.cache.manager import is_cache_complete, get_cache_status
@@ -18,6 +19,9 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
     )
+
+    # GZip compression for responses > 1KB (reduces payload size significantly)
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     # CORS middleware for frontend development
     app.add_middleware(

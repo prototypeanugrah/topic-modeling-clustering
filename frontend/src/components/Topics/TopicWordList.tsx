@@ -3,10 +3,12 @@ import type { TopicWordsResponse } from "../../types/api";
 interface TopicWordListProps {
   data: TopicWordsResponse | null;
   loading: boolean;
+  isValidating?: boolean;
 }
 
-export function TopicWordList({ data, loading }: TopicWordListProps) {
-  if (loading) {
+export function TopicWordList({ data, loading, isValidating }: TopicWordListProps) {
+  // Show full skeleton only on initial load (no cached data)
+  if (loading && !data) {
     return (
       <div className="bg-white rounded-xl shadow-lg p-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -39,8 +41,17 @@ export function TopicWordList({ data, loading }: TopicWordListProps) {
     );
   }
 
+  // Show subtle indicator during background revalidation
+  const showValidatingIndicator = isValidating && data;
+
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6 h-full">
+    <div className={`bg-white rounded-xl shadow-lg p-6 h-full relative transition-opacity ${showValidatingIndicator ? 'opacity-80' : ''}`}>
+      {showValidatingIndicator && (
+        <div className="absolute top-4 right-4 flex items-center gap-2 text-xs text-gray-400">
+          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+          <span>Updating...</span>
+        </div>
+      )}
       <h3 className="text-lg font-semibold text-gray-800 mb-4">
         Top Words per Topic
         <span className="text-sm font-normal text-gray-500 ml-2">({data.n_topics} topics)</span>

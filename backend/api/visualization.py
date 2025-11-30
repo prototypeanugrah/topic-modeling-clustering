@@ -32,9 +32,12 @@ async def get_visualization(n_topics: int):
             detail=f"UMAP projection for {n_topics} topics not available. Run precomputation first."
         )
 
+    # Round to 4 decimal places to reduce payload size (~30% smaller)
+    rounded_projections = [[round(x, 4), round(y, 4)] for x, y in projection.tolist()]
+
     return VisualizationResponse(
         n_topics=n_topics,
-        projections=projection.tolist(),
+        projections=rounded_projections,
         document_ids=list(range(len(projection))),
     )
 
@@ -64,10 +67,13 @@ async def get_clustered_visualization(request: VisualizationRequest):
     # Perform clustering
     result = perform_kmeans(distribution, request.n_clusters)
 
+    # Round to 4 decimal places to reduce payload size (~30% smaller)
+    rounded_projections = [[round(x, 4), round(y, 4)] for x, y in projection.tolist()]
+
     return ClusteredVisualizationResponse(
         n_topics=request.n_topics,
         n_clusters=request.n_clusters,
-        projections=projection.tolist(),
+        projections=rounded_projections,
         cluster_labels=result.labels.tolist(),
         document_ids=list(range(len(projection))),
     )

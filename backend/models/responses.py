@@ -94,3 +94,11 @@ class PrecomputeProgressResponse(BaseModel):
     progress_percent: int
     completed_topics: list[int]
     error: Optional[str]
+
+
+class TopicBundleResponse(BaseModel):
+    """Batch response for topic-related data (reduces API round trips)."""
+
+    words: TopicWordsResponse
+    cluster_metrics: ClusterMetricsResponse
+    visualization: ClusteredVisualizationResponse

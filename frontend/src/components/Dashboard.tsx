@@ -25,10 +25,11 @@ export function Dashboard() {
   const debouncedClusters = useDebounce(nClusters, 150);
 
   // Fetch data - all independent, no blocking
-  const { data: coherenceData, loading: coherenceLoading, error: coherenceError } = useCoherence();
-  const { data: topicWordsData, loading: topicWordsLoading } = useTopicWords(debouncedTopics);
-  const { data: clusterMetricsData, loading: clusterMetricsLoading } = useClusterMetrics(debouncedTopics);
-  const { data: visualizationData, loading: visualizationLoading } = useClusteredVisualization(
+  // isValidating = background revalidation (show stale data with subtle indicator)
+  const { data: coherenceData, loading: coherenceLoading, error: coherenceError, isValidating: coherenceValidating } = useCoherence();
+  const { data: topicWordsData, loading: topicWordsLoading, isValidating: topicWordsValidating } = useTopicWords(debouncedTopics);
+  const { data: clusterMetricsData, loading: clusterMetricsLoading, isValidating: clusterMetricsValidating } = useClusterMetrics(debouncedTopics);
+  const { data: visualizationData, loading: visualizationLoading, isValidating: visualizationValidating } = useClusteredVisualization(
     debouncedTopics,
     debouncedClusters
   );
@@ -137,6 +138,7 @@ export function Dashboard() {
             <TopicWordList
               data={topicWordsData}
               loading={topicWordsLoading}
+              isValidating={topicWordsValidating}
             />
           </div>
         </div>
@@ -146,12 +148,14 @@ export function Dashboard() {
           <CoherenceChart
             data={coherenceData}
             loading={coherenceLoading}
+            isValidating={coherenceValidating}
             selectedTopics={nTopics}
             onSelectTopics={setNTopics}
           />
           <ClusterMetricsChart
             data={clusterMetricsData}
             loading={clusterMetricsLoading}
+            isValidating={clusterMetricsValidating}
             selectedClusters={nClusters}
             onSelectClusters={setNClusters}
           />
@@ -162,6 +166,7 @@ export function Dashboard() {
           <ScatterPlot
             data={visualizationData}
             loading={visualizationLoading}
+            isValidating={visualizationValidating}
           />
         </div>
 
