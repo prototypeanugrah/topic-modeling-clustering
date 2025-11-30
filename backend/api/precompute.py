@@ -32,12 +32,6 @@ def _reset_state():
 
 async def _run_precomputation():
     """Run precomputation in background."""
-    import sys
-    from pathlib import Path
-
-    # Add parent to path
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
     from backend.config import MIN_TOPICS, MAX_TOPICS
     from backend.core.data_loader import load_20newsgroups
     from backend.core.text_preprocessor import preprocess_documents

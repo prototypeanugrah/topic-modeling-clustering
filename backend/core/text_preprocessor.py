@@ -58,8 +58,24 @@ def get_nlp() -> Language:
                 _nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
             except OSError:
                 import subprocess
-                subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"], check=True)
-                _nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+                try:
+                    subprocess.run(
+                        ["python", "-m", "spacy", "download", "en_core_web_sm"],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                    _nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+                except subprocess.CalledProcessError as e:
+                    raise RuntimeError(
+                        f"Failed to download spaCy model 'en_core_web_sm'. "
+                        f"Please install manually: python -m spacy download en_core_web_sm\n"
+                        f"Error: {e.stderr or e.stdout or str(e)}"
+                    ) from e
+                except OSError as e:
+                    raise RuntimeError(
+                        f"Failed to load spaCy model after download. Error: {e}"
+                    ) from e
 
         # Add custom stopwords to spaCy's stopword list
         custom_stops = load_custom_stopwords()
