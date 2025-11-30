@@ -1,0 +1,41 @@
+# Custom Stopwords for Topic Modeling
+# Add one word per line. Lines starting with # are comments.
+# These words will be removed during preprocessing.
+
+# Common newsgroups artifacts
+subject
+wrote
+article
+writes
+write
+posting
+post
+posts
+reply
+replies
+
+# Email/usenet specific
+edu
+com
+org
+university
+
+# Common filler words that may appear after contraction expansion
+would
+could
+should
+might
+
+# Add your own stopwords below:
+think
+know
+say
+like
+use
+new
+get
+find
+want
+try
+fact
+max
