@@ -76,11 +76,9 @@ export const swrPostFetcher = async ([url, body]: [string, object]) => {
 // Prefetch helper - fetches and warms the browser cache
 export const prefetch = (endpoint: string) => {
   const url = `${API_BASE_URL}${endpoint}`;
-  // Use low priority fetch to not block main requests
   fetch(url, {
     headers: { "Content-Type": "application/json" },
-    priority: "low"
-  } as RequestInit).catch(() => {
+  }).catch(() => {
     // Silently ignore prefetch errors
   });
 };
@@ -91,8 +89,7 @@ export const prefetchPost = (endpoint: string, body: object) => {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-    priority: "low",
-  } as RequestInit).catch(() => {
+  }).catch(() => {
     // Silently ignore prefetch errors
   });
 };
