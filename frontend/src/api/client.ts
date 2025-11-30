@@ -1,4 +1,4 @@
-// API Client
+// API Client with SWR support
 
 const API_BASE_URL = "http://localhost:8000/api";
 
@@ -37,6 +37,66 @@ async function fetchApi<T>(
   return response.json();
 }
 
+// SWR fetcher function
+export const swrFetcher = async (url: string) => {
+  const response = await fetch(`${API_BASE_URL}${url}`, {
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new ApiError(
+      response.status,
+      errorData.detail || `HTTP error ${response.status}`
+    );
+  }
+
+  return response.json();
+};
+
+// POST fetcher for SWR
+export const swrPostFetcher = async ([url, body]: [string, object]) => {
+  const response = await fetch(`${API_BASE_URL}${url}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new ApiError(
+      response.status,
+      errorData.detail || `HTTP error ${response.status}`
+    );
+  }
+
+  return response.json();
+};
+
+// Prefetch helper - fetches and warms the browser cache
+export const prefetch = (endpoint: string) => {
+  const url = `${API_BASE_URL}${endpoint}`;
+  // Use low priority fetch to not block main requests
+  fetch(url, {
+    headers: { "Content-Type": "application/json" },
+    priority: "low"
+  } as RequestInit).catch(() => {
+    // Silently ignore prefetch errors
+  });
+};
+
+// Prefetch POST endpoint
+export const prefetchPost = (endpoint: string, body: object) => {
+  fetch(`${API_BASE_URL}${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    priority: "low",
+  } as RequestInit).catch(() => {
+    // Silently ignore prefetch errors
+  });
+};
+
 export const api = {
   // Health & Status
   getHealth: () => fetchApi<import("../types/api").HealthResponse>("/health"),
@@ -50,6 +110,12 @@ export const api = {
   getTopicWords: (nTopics: number, numWords: number = 10) =>
     fetchApi<import("../types/api").TopicWordsResponse>(
       `/topics/${nTopics}/words?num_words=${numWords}`
+    ),
+
+  // Topic Bundle - batch endpoint for all topic-related data
+  getTopicBundle: (nTopics: number, nClusters: number) =>
+    fetchApi<import("../types/api").TopicBundleResponse>(
+      `/topics/${nTopics}/bundle?n_clusters=${nClusters}`
     ),
 
   // Clustering
@@ -91,6 +157,10 @@ export const api = {
     fetchApi<import("../types/api").PrecomputeProgressResponse>(
       "/precompute/progress"
     ),
+
+  // Prefetch helpers
+  prefetch,
+  prefetchPost,
 };
 
-export { ApiError };
+export { ApiError, API_BASE_URL };

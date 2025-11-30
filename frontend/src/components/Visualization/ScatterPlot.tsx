@@ -4,6 +4,7 @@ import type { ClusteredVisualizationResponse } from "../../types/api";
 interface ScatterPlotProps {
   data: ClusteredVisualizationResponse | null;
   loading: boolean;
+  isValidating?: boolean;
 }
 
 // Color palette for clusters
@@ -25,8 +26,9 @@ const CLUSTER_COLORS = [
   "#78716c", // stone
 ];
 
-export function ScatterPlot({ data, loading }: ScatterPlotProps) {
-  if (loading) {
+export function ScatterPlot({ data, loading, isValidating }: ScatterPlotProps) {
+  // Show full skeleton only on initial load (no cached data)
+  if (loading && !data) {
     return (
       <div className="bg-white rounded-xl shadow-lg p-6 h-[550px] flex flex-col">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -91,8 +93,17 @@ export function ScatterPlot({ data, loading }: ScatterPlotProps) {
     hoverinfo: "text" as const,
   }));
 
+  // Show subtle indicator during background revalidation
+  const showValidatingIndicator = isValidating && data;
+
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
+    <div className={`bg-white rounded-xl shadow-lg p-6 relative transition-opacity ${showValidatingIndicator ? 'opacity-80' : ''}`}>
+      {showValidatingIndicator && (
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2 text-xs text-gray-400">
+          <div className="w-2 h-2 bg-pink-400 rounded-full animate-pulse" />
+          <span>Updating...</span>
+        </div>
+      )}
       <h3 className="text-lg font-semibold text-gray-800 mb-4">
         Document Clusters
         <span className="text-sm font-normal text-gray-500 ml-2">

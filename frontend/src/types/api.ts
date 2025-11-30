@@ -76,3 +76,10 @@ export interface PrecomputeProgressResponse {
   completed_topics: number[];
   error: string | null;
 }
+
+// Batch response combining topic words, cluster metrics, and visualization
+export interface TopicBundleResponse {
+  words: TopicWordsResponse;
+  cluster_metrics: ClusterMetricsResponse;
+  visualization: ClusteredVisualizationResponse;
+}
