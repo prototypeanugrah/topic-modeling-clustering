@@ -1,23 +1,25 @@
 """LDA topic model training using Gensim."""
 
+from typing import NamedTuple
+
 import numpy as np
 from gensim import corpora
 from gensim.models import LdaModel
 from gensim.models.coherencemodel import CoherenceModel
-from typing import NamedTuple
 
 from backend.config import (
-    LDA_PASSES,
-    LDA_ITERATIONS,
     LDA_CHUNKSIZE,
+    LDA_ITERATIONS,
+    LDA_PASSES,
     LDA_RANDOM_STATE,
-    MIN_DOC_FREQ,
     MAX_DOC_FREQ_RATIO,
+    MIN_DOC_FREQ,
 )
 
 
 class LDAResult(NamedTuple):
     """Container for LDA training results."""
+
     model: LdaModel
     dictionary: corpora.Dictionary
     corpus: list[list[tuple[int, int]]]
@@ -38,17 +40,13 @@ def create_dictionary(tokenized_docs: list[list[str]]) -> corpora.Dictionary:
     dictionary = corpora.Dictionary(tokenized_docs)
 
     # Filter extremes
-    dictionary.filter_extremes(
-        no_below=MIN_DOC_FREQ,
-        no_above=MAX_DOC_FREQ_RATIO
-    )
+    dictionary.filter_extremes(no_below=MIN_DOC_FREQ, no_above=MAX_DOC_FREQ_RATIO)
 
     return dictionary
 
 
 def create_corpus(
-    tokenized_docs: list[list[str]],
-    dictionary: corpora.Dictionary
+    tokenized_docs: list[list[str]], dictionary: corpora.Dictionary
 ) -> list[list[tuple[int, int]]]:
     """
     Create a bag-of-words corpus from tokenized documents.
@@ -171,14 +169,13 @@ def calculate_perplexity(
     Returns:
         Perplexity score (lower is better)
     """
-    log_perp = model.log_perplexity(corpus)
-    # Convert log perplexity to perplexity: perplexity = 2^(-log_perplexity)
-    return 2 ** (-log_perp)
+    log_perp = model.log_perplexity(corpus)  # returns the per-word bound score
+    # Convert log perplexity to perplexity: perplexity = np.exp2(-log_perplexity)
+    return np.exp2(-log_perp)
 
 
 def get_topic_words(
-    model: LdaModel,
-    num_words: int = 10
+    model: LdaModel, num_words: int = 10
 ) -> list[list[tuple[str, float]]]:
     """
     Get top words for each topic.
