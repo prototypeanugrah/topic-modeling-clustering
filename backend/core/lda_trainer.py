@@ -234,3 +234,133 @@ def train_lda_full(
         doc_topic_distribution=doc_topic_dist,
         coherence_score=coherence,
     )
+
+
+class CVFoldResult(NamedTuple):
+    """Result from a single CV fold."""
+    fold: int
+    perplexity: float
+    coherence: float
+
+
+class CVResult(NamedTuple):
+    """Aggregated cross-validation results."""
+    num_topics: int
+    fold_results: list[CVFoldResult]
+    avg_perplexity: float
+    avg_coherence: float
+    std_perplexity: float
+    std_coherence: float
+
+
+def train_lda_cv_fold(
+    train_corpus: list[list[tuple[int, int]]],
+    train_tokenized: list[list[str]],
+    val_corpus: list[list[tuple[int, int]]],
+    dictionary: corpora.Dictionary,
+    num_topics: int,
+) -> tuple[float, float]:
+    """
+    Train LDA on one CV fold and evaluate.
+
+    Args:
+        train_corpus: Training corpus (bag-of-words)
+        train_tokenized: Training tokenized docs (for coherence)
+        val_corpus: Validation corpus (bag-of-words)
+        dictionary: Frozen dictionary (built from full train set)
+        num_topics: Number of topics
+
+    Returns:
+        Tuple of (perplexity, coherence)
+        - Perplexity: measured on validation set (generalization)
+        - Coherence: measured on training set (topic quality needs sufficient co-occurrence data)
+    """
+    # Train on fold's training set
+    model = train_lda(train_corpus, dictionary, num_topics)
+
+    # Perplexity on validation set (measures generalization)
+    perplexity = calculate_perplexity(model, val_corpus)
+
+    # Coherence on training set (needs sufficient data for word co-occurrence stats)
+    coherence = calculate_coherence(model, train_tokenized, dictionary)
+
+    return perplexity, coherence
+
+
+def run_cross_validation(
+    tokenized_docs: list[list[str]],
+    corpus: list[list[tuple[int, int]]],
+    dictionary: corpora.Dictionary,
+    num_topics: int,
+    n_folds: int = 5,
+    random_state: int = 42,
+    show_progress: bool = True,
+) -> CVResult:
+    """
+    Run k-fold cross-validation for LDA model.
+
+    Args:
+        tokenized_docs: Full training tokenized documents
+        corpus: Full training corpus (bag-of-words)
+        dictionary: Frozen dictionary (built from full train set)
+        num_topics: Number of topics to evaluate
+        n_folds: Number of CV folds
+        random_state: Random seed for reproducibility
+        show_progress: Whether to show tqdm progress bar
+
+    Returns:
+        CVResult with averaged metrics across folds
+    """
+    from sklearn.model_selection import KFold
+    from tqdm import tqdm
+
+    kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
+
+    fold_results = []
+    perplexities = []
+    coherences = []
+
+    folds_iter = enumerate(kf.split(tokenized_docs))
+    if show_progress:
+        folds_iter = tqdm(
+            list(folds_iter),
+            desc=f"CV k={num_topics}",
+            leave=False,
+            unit="fold",
+        )
+
+    for fold_idx, (train_idx, val_idx) in folds_iter:
+        # Split data
+        train_corpus_fold = [corpus[i] for i in train_idx]
+        train_tokenized_fold = [tokenized_docs[i] for i in train_idx]
+        val_corpus_fold = [corpus[i] for i in val_idx]
+
+        # Train and evaluate
+        perplexity, coherence = train_lda_cv_fold(
+            train_corpus_fold,
+            train_tokenized_fold,
+            val_corpus_fold,
+            dictionary,
+            num_topics,
+        )
+
+        fold_results.append(CVFoldResult(
+            fold=fold_idx + 1,
+            perplexity=perplexity,
+            coherence=coherence,
+        ))
+        perplexities.append(perplexity)
+        coherences.append(coherence)
+
+        # Update progress bar with latest metrics
+        if show_progress and hasattr(folds_iter, 'set_postfix'):
+            folds_iter.set_postfix(coh=f"{coherence:.4f}", perp=f"{perplexity:.1f}")
+
+    return CVResult(
+        num_topics=num_topics,
+        fold_results=fold_results,
+        avg_perplexity=float(np.mean(perplexities)),
+        avg_coherence=float(np.mean(coherences)),
+        std_perplexity=float(np.std(perplexities)),
+        std_coherence=float(np.std(coherences)),
+    )

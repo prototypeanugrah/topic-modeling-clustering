@@ -43,36 +43,54 @@ def load_dictionary() -> corpora.Dictionary | None:
     return None
 
 
-def save_corpus(corpus: list) -> Path:
-    """Save corpus to cache."""
+def save_corpus(corpus: list, dataset: str = "train") -> Path:
+    """Save corpus to cache.
+
+    Args:
+        corpus: Bag-of-words corpus
+        dataset: 'train' or 'test'
+    """
     ensure_cache_dirs()
-    path = MODELS_DIR / "corpus.pkl"
+    path = MODELS_DIR / f"corpus_{dataset}.pkl"
     with open(path, "wb") as f:
         pickle.dump(corpus, f)
     return path
 
 
-def load_corpus() -> list | None:
-    """Load corpus from cache."""
-    path = MODELS_DIR / "corpus.pkl"
+def load_corpus(dataset: str = "train") -> list | None:
+    """Load corpus from cache.
+
+    Args:
+        dataset: 'train' or 'test'
+    """
+    path = MODELS_DIR / f"corpus_{dataset}.pkl"
     if path.exists():
         with open(path, "rb") as f:
             return pickle.load(f)
     return None
 
 
-def save_tokenized_docs(tokenized_docs: list[list[str]]) -> Path:
-    """Save tokenized documents to cache."""
+def save_tokenized_docs(tokenized_docs: list[list[str]], dataset: str = "train") -> Path:
+    """Save tokenized documents to cache.
+
+    Args:
+        tokenized_docs: List of tokenized documents
+        dataset: 'train' or 'test'
+    """
     ensure_cache_dirs()
-    path = MODELS_DIR / "tokenized_docs.pkl"
+    path = MODELS_DIR / f"tokenized_{dataset}.pkl"
     with open(path, "wb") as f:
         pickle.dump(tokenized_docs, f)
     return path
 
 
-def load_tokenized_docs() -> list[list[str]] | None:
-    """Load tokenized documents from cache."""
-    path = MODELS_DIR / "tokenized_docs.pkl"
+def load_tokenized_docs(dataset: str = "train") -> list[list[str]] | None:
+    """Load tokenized documents from cache.
+
+    Args:
+        dataset: 'train' or 'test'
+    """
+    path = MODELS_DIR / f"tokenized_{dataset}.pkl"
     if path.exists():
         with open(path, "rb") as f:
             return pickle.load(f)
@@ -95,42 +113,69 @@ def load_lda_model(num_topics: int) -> LdaModel | None:
     return None
 
 
-def save_doc_topic_distribution(dist: np.ndarray, num_topics: int) -> Path:
-    """Save document-topic distribution to cache."""
+def save_doc_topic_distribution(dist: np.ndarray, num_topics: int, dataset: str = "train") -> Path:
+    """Save document-topic distribution to cache.
+
+    Args:
+        dist: Document-topic distribution matrix
+        num_topics: Number of topics
+        dataset: 'train' or 'test'
+    """
     ensure_cache_dirs()
-    path = DISTRIBUTIONS_DIR / f"doc_topic_k{num_topics}.npy"
+    path = DISTRIBUTIONS_DIR / f"doc_topic_{dataset}_k{num_topics}.npy"
     np.save(path, dist)
     return path
 
 
-def load_doc_topic_distribution(num_topics: int) -> np.ndarray | None:
-    """Load document-topic distribution from cache."""
-    path = DISTRIBUTIONS_DIR / f"doc_topic_k{num_topics}.npy"
+def load_doc_topic_distribution(num_topics: int, dataset: str = "train") -> np.ndarray | None:
+    """Load document-topic distribution from cache.
+
+    Args:
+        num_topics: Number of topics
+        dataset: 'train' or 'test'
+    """
+    path = DISTRIBUTIONS_DIR / f"doc_topic_{dataset}_k{num_topics}.npy"
     if path.exists():
         return np.load(path)
     return None
 
 
-def save_umap_projection(projection: np.ndarray, num_topics: int) -> Path:
-    """Save UMAP projection to cache."""
+def save_umap_projection(projection: np.ndarray, num_topics: int, dataset: str = "train") -> Path:
+    """Save UMAP projection to cache.
+
+    Args:
+        projection: UMAP 2D projection
+        num_topics: Number of topics
+        dataset: 'train' or 'test'
+    """
     ensure_cache_dirs()
-    path = PROJECTIONS_DIR / f"umap_k{num_topics}.npy"
+    path = PROJECTIONS_DIR / f"umap_{dataset}_k{num_topics}.npy"
     np.save(path, projection)
     return path
 
 
-def load_umap_projection(num_topics: int) -> np.ndarray | None:
-    """Load UMAP projection from cache."""
-    path = PROJECTIONS_DIR / f"umap_k{num_topics}.npy"
+def load_umap_projection(num_topics: int, dataset: str = "train") -> np.ndarray | None:
+    """Load UMAP projection from cache.
+
+    Args:
+        num_topics: Number of topics
+        dataset: 'train' or 'test'
+    """
+    path = PROJECTIONS_DIR / f"umap_{dataset}_k{num_topics}.npy"
     if path.exists():
         return np.load(path)
     return None
 
 
-def save_coherence_scores(scores: dict[int, float]) -> Path:
-    """Save coherence scores to cache."""
+def save_coherence_scores(scores: dict[int, float], split: str = "test") -> Path:
+    """Save coherence scores to cache.
+
+    Args:
+        scores: Dictionary mapping topic count to coherence score
+        split: 'val' (averaged from CV) or 'test' (final evaluation)
+    """
     ensure_cache_dirs()
-    path = METRICS_DIR / "coherence_scores.json"
+    path = METRICS_DIR / f"coherence_{split}.json"
     # Convert int keys to strings for JSON
     json_scores = {str(k): v for k, v in scores.items()}
     with open(path, "w") as f:
@@ -138,9 +183,13 @@ def save_coherence_scores(scores: dict[int, float]) -> Path:
     return path
 
 
-def load_coherence_scores() -> dict[int, float] | None:
-    """Load coherence scores from cache."""
-    path = METRICS_DIR / "coherence_scores.json"
+def load_coherence_scores(split: str = "test") -> dict[int, float] | None:
+    """Load coherence scores from cache.
+
+    Args:
+        split: 'val' (averaged from CV) or 'test' (final evaluation)
+    """
+    path = METRICS_DIR / f"coherence_{split}.json"
     if path.exists():
         with open(path, "r") as f:
             json_scores = json.load(f)
@@ -149,10 +198,15 @@ def load_coherence_scores() -> dict[int, float] | None:
     return None
 
 
-def save_perplexity_scores(scores: dict[int, float]) -> Path:
-    """Save perplexity scores to cache."""
+def save_perplexity_scores(scores: dict[int, float], split: str = "test") -> Path:
+    """Save perplexity scores to cache.
+
+    Args:
+        scores: Dictionary mapping topic count to perplexity score
+        split: 'val' (averaged from CV) or 'test' (final evaluation)
+    """
     ensure_cache_dirs()
-    path = METRICS_DIR / "perplexity_scores.json"
+    path = METRICS_DIR / f"perplexity_{split}.json"
     # Convert int keys to strings for JSON
     json_scores = {str(k): v for k, v in scores.items()}
     with open(path, "w") as f:
@@ -160,9 +214,13 @@ def save_perplexity_scores(scores: dict[int, float]) -> Path:
     return path
 
 
-def load_perplexity_scores() -> dict[int, float] | None:
-    """Load perplexity scores from cache."""
-    path = METRICS_DIR / "perplexity_scores.json"
+def load_perplexity_scores(split: str = "test") -> dict[int, float] | None:
+    """Load perplexity scores from cache.
+
+    Args:
+        split: 'val' (averaged from CV) or 'test' (final evaluation)
+    """
+    path = METRICS_DIR / f"perplexity_{split}.json"
     if path.exists():
         with open(path, "r") as f:
             json_scores = json.load(f)
@@ -173,26 +231,34 @@ def load_perplexity_scores() -> dict[int, float] | None:
 
 def is_cache_complete() -> bool:
     """Check if all precomputed artifacts exist."""
-    # Check dictionary and corpus
+    # Check dictionary
     if not (MODELS_DIR / "dictionary.pkl").exists():
         return False
-    if not (MODELS_DIR / "corpus.pkl").exists():
-        return False
-    if not (MODELS_DIR / "tokenized_docs.pkl").exists():
-        return False
+
+    # Check train and test corpora and tokenized docs
+    for dataset in ["train", "test"]:
+        if not (MODELS_DIR / f"corpus_{dataset}.pkl").exists():
+            return False
+        if not (MODELS_DIR / f"tokenized_{dataset}.pkl").exists():
+            return False
 
     # Check LDA models and distributions for all topic counts
     for n in range(MIN_TOPICS, MAX_TOPICS + 1):
         if not (MODELS_DIR / f"lda_k{n}.pkl").exists():
             return False
-        if not (DISTRIBUTIONS_DIR / f"doc_topic_k{n}.npy").exists():
-            return False
-        if not (PROJECTIONS_DIR / f"umap_k{n}.npy").exists():
-            return False
+        # Check train and test distributions and projections
+        for dataset in ["train", "test"]:
+            if not (DISTRIBUTIONS_DIR / f"doc_topic_{dataset}_k{n}.npy").exists():
+                return False
+            if not (PROJECTIONS_DIR / f"umap_{dataset}_k{n}.npy").exists():
+                return False
 
-    # Check coherence scores
-    if not (METRICS_DIR / "coherence_scores.json").exists():
-        return False
+    # Check val and test coherence/perplexity scores
+    for split in ["val", "test"]:
+        if not (METRICS_DIR / f"coherence_{split}.json").exists():
+            return False
+        if not (METRICS_DIR / f"perplexity_{split}.json").exists():
+            return False
 
     return True
 
@@ -202,18 +268,27 @@ def get_cache_status() -> dict[str, Any]:
     status = {
         "complete": is_cache_complete(),
         "dictionary": (MODELS_DIR / "dictionary.pkl").exists(),
-        "corpus": (MODELS_DIR / "corpus.pkl").exists(),
-        "tokenized_docs": (MODELS_DIR / "tokenized_docs.pkl").exists(),
-        "coherence_scores": (METRICS_DIR / "coherence_scores.json").exists(),
+        "corpus_train": (MODELS_DIR / "corpus_train.pkl").exists(),
+        "corpus_test": (MODELS_DIR / "corpus_test.pkl").exists(),
+        "tokenized_train": (MODELS_DIR / "tokenized_train.pkl").exists(),
+        "tokenized_test": (MODELS_DIR / "tokenized_test.pkl").exists(),
+        "coherence_val": (METRICS_DIR / "coherence_val.json").exists(),
+        "coherence_test": (METRICS_DIR / "coherence_test.json").exists(),
+        "perplexity_val": (METRICS_DIR / "perplexity_val.json").exists(),
+        "perplexity_test": (METRICS_DIR / "perplexity_test.json").exists(),
         "models": {},
-        "distributions": {},
-        "projections": {},
+        "distributions_train": {},
+        "distributions_test": {},
+        "projections_train": {},
+        "projections_test": {},
     }
 
     for n in range(MIN_TOPICS, MAX_TOPICS + 1):
         status["models"][n] = (MODELS_DIR / f"lda_k{n}.pkl").exists()
-        status["distributions"][n] = (DISTRIBUTIONS_DIR / f"doc_topic_k{n}.npy").exists()
-        status["projections"][n] = (PROJECTIONS_DIR / f"umap_k{n}.npy").exists()
+        status["distributions_train"][n] = (DISTRIBUTIONS_DIR / f"doc_topic_train_k{n}.npy").exists()
+        status["distributions_test"][n] = (DISTRIBUTIONS_DIR / f"doc_topic_test_k{n}.npy").exists()
+        status["projections_train"][n] = (PROJECTIONS_DIR / f"umap_train_k{n}.npy").exists()
+        status["projections_test"][n] = (PROJECTIONS_DIR / f"umap_test_k{n}.npy").exists()
 
     return status
 
@@ -241,6 +316,28 @@ def get_pyldavis_path(num_topics: int) -> Path | None:
     path = PYLDAVIS_DIR / f"k{num_topics}.html"
     if path.exists():
         return path
+    return None
+
+
+def save_eda_stats(stats: dict) -> Path:
+    """Save EDA statistics to cache.
+
+    Args:
+        stats: Dictionary with EDA statistics for all stages
+    """
+    ensure_cache_dirs()
+    path = METRICS_DIR / "eda_stats.json"
+    with open(path, "w") as f:
+        json.dump(stats, f, indent=2)
+    return path
+
+
+def load_eda_stats() -> dict | None:
+    """Load EDA statistics from cache."""
+    path = METRICS_DIR / "eda_stats.json"
+    if path.exists():
+        with open(path, "r") as f:
+            return json.load(f)
     return None
 
 

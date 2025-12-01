@@ -1,5 +1,6 @@
 """Pydantic request models."""
 
+from typing import Literal
 from pydantic import BaseModel, Field
 
 from backend.config import MIN_TOPICS, MAX_TOPICS, MIN_CLUSTERS, MAX_CLUSTERS
@@ -20,6 +21,10 @@ class ClusteringRequest(BaseModel):
         le=MAX_CLUSTERS,
         description=f"Number of clusters ({MIN_CLUSTERS}-{MAX_CLUSTERS})"
     )
+    dataset: Literal["train", "test"] = Field(
+        default="train",
+        description="Which dataset to cluster (train or test)"
+    )
 
 
 class VisualizationRequest(BaseModel):
@@ -36,4 +41,8 @@ class VisualizationRequest(BaseModel):
         ge=MIN_CLUSTERS,
         le=MAX_CLUSTERS,
         description=f"Number of clusters ({MIN_CLUSTERS}-{MAX_CLUSTERS})"
+    )
+    dataset: Literal["train", "test"] = Field(
+        default="train",
+        description="Which dataset to visualize (train or test)"
     )

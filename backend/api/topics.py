@@ -34,12 +34,18 @@ async def get_coherence_scores(response: Response):
     """
     Get coherence and perplexity scores for all topic counts.
 
+    Returns both validation (5-fold CV averaged) and test (held-out) scores.
     Used for the "optimal number of topics" chart.
     """
-    scores = load_coherence_scores()
-    perplexity = load_perplexity_scores()
+    # Load validation scores (from CV)
+    coherence_val = load_coherence_scores("val")
+    perplexity_val = load_perplexity_scores("val")
 
-    if scores is None:
+    # Load test scores (final evaluation)
+    coherence_test = load_coherence_scores("test")
+    perplexity_test = load_perplexity_scores("test")
+
+    if coherence_test is None:
         raise HTTPException(
             status_code=503,
             detail="Coherence scores not available. Run precomputation first."
@@ -48,17 +54,23 @@ async def get_coherence_scores(response: Response):
     # Add cache headers - this data doesn't change after precomputation
     response.headers.update(CACHE_HEADERS)
 
-    topic_counts = sorted(scores.keys())
-    coherence_values = [scores[k] for k in topic_counts]
-    perplexity_values = [perplexity[k] for k in topic_counts] if perplexity else []
+    topic_counts = sorted(coherence_test.keys())
 
-    # Find optimal (highest coherence)
-    optimal_topics = max(scores, key=scores.get)
+    # Build response arrays
+    coherence_val_values = [coherence_val.get(k, 0) for k in topic_counts] if coherence_val else []
+    perplexity_val_values = [perplexity_val.get(k, 0) for k in topic_counts] if perplexity_val else []
+    coherence_test_values = [coherence_test[k] for k in topic_counts]
+    perplexity_test_values = [perplexity_test.get(k, 0) for k in topic_counts] if perplexity_test else []
+
+    # Find optimal based on test coherence
+    optimal_topics = max(coherence_test, key=coherence_test.get)
 
     return CoherenceResponse(
         topic_counts=topic_counts,
-        coherence_scores=coherence_values,
-        perplexity_scores=perplexity_values,
+        coherence_val=coherence_val_values,
+        perplexity_val=perplexity_val_values,
+        coherence_test=coherence_test_values,
+        perplexity_test=perplexity_test_values,
         optimal_topics=optimal_topics,
     )
 
@@ -104,12 +116,16 @@ async def get_topic_words(n_topics: int, response: Response, num_words: int = 10
 
 
 @router.get("/{n_topics}/distribution")
-async def get_topic_distribution(n_topics: int):
+async def get_topic_distribution(n_topics: int, dataset: str = "train"):
     """
     Get document-topic distribution matrix.
 
+    Args:
+        n_topics: Number of topics
+        dataset: Which dataset to get distribution for (train or test)
+
     Returns the topic distribution for all documents.
-    Note: This can be a large response (~18K documents x n_topics floats).
+    Note: This can be a large response (~11K train or ~7.5K test documents x n_topics floats).
     """
     if n_topics < MIN_TOPICS or n_topics > MAX_TOPICS:
         raise HTTPException(
@@ -117,16 +133,23 @@ async def get_topic_distribution(n_topics: int):
             detail=f"n_topics must be between {MIN_TOPICS} and {MAX_TOPICS}"
         )
 
-    distribution = load_doc_topic_distribution(n_topics)
+    if dataset not in ["train", "test"]:
+        raise HTTPException(
+            status_code=400,
+            detail="dataset must be 'train' or 'test'"
+        )
+
+    distribution = load_doc_topic_distribution(n_topics, dataset)
 
     if distribution is None:
         raise HTTPException(
             status_code=503,
-            detail=f"Distribution for {n_topics} topics not available. Run precomputation first."
+            detail=f"Distribution for {n_topics} topics ({dataset}) not available. Run precomputation first."
         )
 
     return {
         "n_topics": n_topics,
+        "dataset": dataset,
         "n_documents": distribution.shape[0],
         "distribution": distribution.tolist(),
     }
@@ -157,9 +180,15 @@ async def get_pyldavis(n_topics: int):
 
 
 @router.get("/{n_topics}/bundle", response_model=TopicBundleResponse)
-async def get_topic_bundle(n_topics: int, n_clusters: int = 5, num_words: int = 10):
+async def get_topic_bundle(n_topics: int, n_clusters: int = 5, num_words: int = 10, dataset: str = "train"):
     """
     Get bundled topic data in a single request (reduces round trips).
+
+    Args:
+        n_topics: Number of topics
+        n_clusters: Number of clusters
+        num_words: Number of top words per topic
+        dataset: Which dataset to use for visualization (train or test)
 
     Returns topic words, cluster metrics, and visualization data together.
     This is optimized for the dashboard to minimize latency.
@@ -176,15 +205,21 @@ async def get_topic_bundle(n_topics: int, n_clusters: int = 5, num_words: int = 
             detail=f"n_clusters must be between {MIN_CLUSTERS} and {MAX_CLUSTERS}"
         )
 
+    if dataset not in ["train", "test"]:
+        raise HTTPException(
+            status_code=400,
+            detail="dataset must be 'train' or 'test'"
+        )
+
     # Load all required data
     model = load_lda_model(n_topics)
-    distribution = load_doc_topic_distribution(n_topics)
-    projection = load_umap_projection(n_topics)
+    distribution = load_doc_topic_distribution(n_topics, dataset)
+    projection = load_umap_projection(n_topics, dataset)
 
     if model is None or distribution is None or projection is None:
         raise HTTPException(
             status_code=503,
-            detail=f"Data for {n_topics} topics not available. Run precomputation first."
+            detail=f"Data for {n_topics} topics ({dataset}) not available. Run precomputation first."
         )
 
     # 1. Topic words
@@ -197,7 +232,7 @@ async def get_topic_bundle(n_topics: int, n_clusters: int = 5, num_words: int = 
         ])
     words_response = TopicWordsResponse(n_topics=n_topics, topics=topics)
 
-    # 2. Cluster metrics
+    # 2. Cluster metrics (computed on the selected dataset)
     metrics = compute_metrics_for_all_clusters(
         distribution,
         min_clusters=MIN_CLUSTERS,
@@ -221,6 +256,7 @@ async def get_topic_bundle(n_topics: int, n_clusters: int = 5, num_words: int = 
         projections=rounded_projections,
         cluster_labels=result.labels.tolist(),
         document_ids=list(range(len(projection))),
+        dataset=dataset,
     )
 
     return TopicBundleResponse(

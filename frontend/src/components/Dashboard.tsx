@@ -5,10 +5,12 @@ import { ClusterMetricsChart } from "./Charts/ClusterMetricsChart";
 import { ScatterPlot } from "./Visualization/ScatterPlot";
 import { TopicWordList } from "./Topics/TopicWordList";
 import { PyLDAvisViewer } from "./Topics/PyLDAvisViewer";
+import { DatasetOverview } from "./EDA/DatasetOverview";
 import { LoadingSkeleton } from "./ui/LoadingSkeleton";
 import { useDebounce } from "../hooks/useDebounce";
 import { useCoherence, useTopicWords, useClusterMetrics } from "../hooks/useTopicData";
 import { useClusteredVisualization } from "../hooks/useClusterData";
+import { useEDA } from "../hooks/useEDA";
 import { api } from "../api/client";
 import type { HealthResponse } from "../types/api";
 
@@ -16,8 +18,9 @@ export function Dashboard() {
   // State - start with minimum values
   const [nTopics, setNTopics] = useState(2);
   const [nClusters, setNClusters] = useState(2);
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [healthLoading, setHealthLoading] = useState(true);
+  const [dataset, setDataset] = useState<"train" | "test">("train");
+  const [_health, setHealth] = useState<HealthResponse | null>(null);
+  const [_healthLoading, setHealthLoading] = useState(true);
   const [healthError, setHealthError] = useState<string | null>(null);
 
   // Debounce slider values - reduced delay for snappier feel
@@ -31,8 +34,10 @@ export function Dashboard() {
   const { data: clusterMetricsData, loading: clusterMetricsLoading, isValidating: clusterMetricsValidating } = useClusterMetrics(debouncedTopics);
   const { data: visualizationData, loading: visualizationLoading, isValidating: visualizationValidating } = useClusteredVisualization(
     debouncedTopics,
-    debouncedClusters
+    debouncedClusters,
+    dataset
   );
+  const { data: edaData, loading: edaLoading, isValidating: edaValidating } = useEDA();
 
   // Check health on mount
   useEffect(() => {
@@ -113,6 +118,15 @@ export function Dashboard() {
           </p>
         </header>
 
+        {/* Dataset Overview (EDA) */}
+        <div className="mb-6">
+          <DatasetOverview
+            data={edaData}
+            loading={edaLoading}
+            isValidating={edaValidating}
+          />
+        </div>
+
         {/* Row 1: Controls + Top Words per Topic */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           {/* Control Panel */}
@@ -167,6 +181,8 @@ export function Dashboard() {
             data={visualizationData}
             loading={visualizationLoading}
             isValidating={visualizationValidating}
+            dataset={dataset}
+            onDatasetChange={setDataset}
           />
         </div>
 
@@ -179,7 +195,7 @@ export function Dashboard() {
 
         {/* Footer */}
         <footer className="text-center text-sm text-gray-500 py-6">
-          Topic Modeling with LDA | K-Means Clustering | UMAP Visualization
+          Topic Modeling with LDA | K-Means Clustering
         </footer>
       </div>
     </div>

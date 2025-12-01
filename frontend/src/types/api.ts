@@ -8,19 +8,30 @@ export interface HealthResponse {
 export interface StatusResponse {
   complete: boolean;
   dictionary: boolean;
-  corpus: boolean;
-  tokenized_docs: boolean;
-  coherence_scores: boolean;
+  corpus_train: boolean;
+  corpus_test: boolean;
+  tokenized_train: boolean;
+  tokenized_test: boolean;
+  coherence_val: boolean;
+  coherence_test: boolean;
+  perplexity_val: boolean;
+  perplexity_test: boolean;
   models: Record<number, boolean>;
-  distributions: Record<number, boolean>;
-  projections: Record<number, boolean>;
+  distributions_train: Record<number, boolean>;
+  distributions_test: Record<number, boolean>;
+  projections_train: Record<number, boolean>;
+  projections_test: Record<number, boolean>;
 }
 
 export interface CoherenceResponse {
   topic_counts: number[];
-  coherence_scores: number[];
-  perplexity_scores: number[];
-  optimal_topics: number;
+  // Validation scores (averaged from 5-fold CV)
+  coherence_val: number[];
+  perplexity_val: number[];
+  // Test scores (final evaluation on held-out set)
+  coherence_test: number[];
+  perplexity_test: number[];
+  optimal_topics: number; // Based on test coherence
 }
 
 export interface TopicWord {
@@ -36,6 +47,7 @@ export interface TopicWordsResponse {
 export interface ClusteringRequest {
   n_topics: number;
   n_clusters: number;
+  dataset?: "train" | "test";
 }
 
 export interface ClusteringResponse {
@@ -59,6 +71,7 @@ export interface VisualizationResponse {
   n_topics: number;
   projections: number[][];
   document_ids: number[];
+  dataset: "train" | "test";
 }
 
 export interface ClusteredVisualizationResponse {
@@ -67,6 +80,7 @@ export interface ClusteredVisualizationResponse {
   projections: number[][];
   cluster_labels: number[];
   document_ids: number[];
+  dataset: "train" | "test";
 }
 
 export interface PrecomputeProgressResponse {
@@ -82,4 +96,39 @@ export interface TopicBundleResponse {
   words: TopicWordsResponse;
   cluster_metrics: ClusterMetricsResponse;
   visualization: ClusteredVisualizationResponse;
+}
+
+// EDA (Exploratory Data Analysis) types
+export interface StageStats {
+  n_documents: number;
+  avg_length: number;
+  median_length: number;
+  min_length: number;
+  max_length: number;
+  std_length: number;
+  empty_count: number;
+  empty_pct: number;
+  percentiles: Record<number, number>;
+  histogram_bins: number[];
+  histogram_counts: number[];
+}
+
+export interface EDAResponse {
+  // Stage 1: Raw documents (character lengths)
+  raw_train: StageStats;
+  raw_test: StageStats;
+
+  // Stage 2: Tokenized (before filter_extremes)
+  vocab_before_filter: number;
+  tokenized_train: StageStats;
+  tokenized_test: StageStats;
+
+  // Stage 3: Filtered (corpus for LDA)
+  vocab_after_filter: number;
+  filtered_train: StageStats;
+  filtered_test: StageStats;
+
+  // Summary metrics
+  vocab_reduction_pct: number;
+  token_reduction_pct: number;
 }

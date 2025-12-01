@@ -11,7 +11,13 @@ class NewsGroupsData(NamedTuple):
     target_names: list[str]
 
 
-def load_20newsgroups(subset: str = "all", remove_headers: bool = True) -> NewsGroupsData:
+class TrainTestData(NamedTuple):
+    """Container for train and test splits."""
+    train: NewsGroupsData
+    test: NewsGroupsData
+
+
+def load_20newsgroups(subset: str = "train", remove_headers: bool = True) -> NewsGroupsData:
     """
     Load the 20 Newsgroups dataset.
 
@@ -50,3 +56,26 @@ def get_category_distribution(data: NewsGroupsData) -> dict[str, int]:
         category = data.target_names[label]
         distribution[category] = distribution.get(category, 0) + 1
     return distribution
+
+
+def load_train_data(remove_headers: bool = True) -> NewsGroupsData:
+    """Load the training set (11,314 documents)."""
+    return load_20newsgroups(subset="train", remove_headers=remove_headers)
+
+
+def load_test_data(remove_headers: bool = True) -> NewsGroupsData:
+    """Load the test set (7,532 documents)."""
+    return load_20newsgroups(subset="test", remove_headers=remove_headers)
+
+
+def load_train_test_data(remove_headers: bool = True) -> TrainTestData:
+    """
+    Load both train and test sets.
+
+    Returns:
+        TrainTestData with train (11,314 docs) and test (7,532 docs)
+    """
+    return TrainTestData(
+        train=load_train_data(remove_headers=remove_headers),
+        test=load_test_data(remove_headers=remove_headers),
+    )

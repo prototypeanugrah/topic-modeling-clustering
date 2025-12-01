@@ -155,6 +155,9 @@ export const api = {
       "/precompute/progress"
     ),
 
+  // EDA
+  getEDA: () => fetchApi<import("../types/api").EDAResponse>("/eda"),
+
   // Prefetch helpers
   prefetch,
   prefetchPost,
