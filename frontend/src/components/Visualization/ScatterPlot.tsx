@@ -5,6 +5,8 @@ interface ScatterPlotProps {
   data: ClusteredVisualizationResponse | null;
   loading: boolean;
   isValidating?: boolean;
+  dataset: "train" | "test";
+  onDatasetChange: (dataset: "train" | "test") => void;
 }
 
 // Color palette for clusters
@@ -26,21 +28,50 @@ const CLUSTER_COLORS = [
   "#78716c", // stone
 ];
 
-export function ScatterPlot({ data, loading, isValidating }: ScatterPlotProps) {
+export function ScatterPlot({ data, loading, isValidating, dataset, onDatasetChange }: ScatterPlotProps) {
+  // Dataset toggle component
+  const DatasetToggle = () => (
+    <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+      <button
+        onClick={() => onDatasetChange("train")}
+        className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+          dataset === "train"
+            ? "bg-white text-gray-800 shadow-sm"
+            : "text-gray-500 hover:text-gray-700"
+        }`}
+      >
+        Train
+      </button>
+      <button
+        onClick={() => onDatasetChange("test")}
+        className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+          dataset === "test"
+            ? "bg-white text-gray-800 shadow-sm"
+            : "text-gray-500 hover:text-gray-700"
+        }`}
+      >
+        Test
+      </button>
+    </div>
+  );
+
   // Show full skeleton only on initial load (no cached data)
   if (loading && !data) {
     return (
       <div className="bg-white rounded-xl shadow-lg p-6 h-[550px] flex flex-col">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">
-          Document Clusters
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-800">
+            Document Clusters
+          </h3>
+          <DatasetToggle />
+        </div>
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="relative">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-pink-200"></div>
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-pink-600 border-t-transparent absolute top-0 left-0"></div>
           </div>
           <span className="text-gray-500 text-sm mt-4">Rendering visualization...</span>
-          <span className="text-gray-400 text-xs mt-1">Processing ~18,000 documents</span>
+          <span className="text-gray-400 text-xs mt-1">Processing documents...</span>
         </div>
       </div>
     );
@@ -49,9 +80,12 @@ export function ScatterPlot({ data, loading, isValidating }: ScatterPlotProps) {
   if (!data) {
     return (
       <div className="bg-white rounded-xl shadow-lg p-6 h-[550px] flex flex-col">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">
-          Document Clusters
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-800">
+            Document Clusters
+          </h3>
+          <DatasetToggle />
+        </div>
         <div className="flex-1 flex flex-col items-center justify-center">
           <svg className="w-12 h-12 text-red-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -96,20 +130,26 @@ export function ScatterPlot({ data, loading, isValidating }: ScatterPlotProps) {
   // Show subtle indicator during background revalidation
   const showValidatingIndicator = isValidating && data;
 
+  // Document count based on dataset
+  const docCount = data.projections.length.toLocaleString();
+
   return (
     <div className={`bg-white rounded-xl shadow-lg p-6 relative transition-opacity ${showValidatingIndicator ? 'opacity-80' : ''}`}>
       {showValidatingIndicator && (
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-2 text-xs text-gray-400">
+        <div className="absolute top-16 right-4 z-10 flex items-center gap-2 text-xs text-gray-400">
           <div className="w-2 h-2 bg-pink-400 rounded-full animate-pulse" />
           <span>Updating...</span>
         </div>
       )}
-      <h3 className="text-lg font-semibold text-gray-800 mb-4">
-        Document Clusters
-        <span className="text-sm font-normal text-gray-500 ml-2">
-          ({data.n_topics} topics, {data.n_clusters} clusters)
-        </span>
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-800">
+          Document Clusters
+          <span className="text-sm font-normal text-gray-500 ml-2">
+            ({data.n_topics} topics, {data.n_clusters} clusters, {docCount} docs)
+          </span>
+        </h3>
+        <DatasetToggle />
+      </div>
       <Plot
         data={traces}
         layout={{

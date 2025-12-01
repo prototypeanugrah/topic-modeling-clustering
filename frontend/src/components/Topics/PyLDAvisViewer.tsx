@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { LoadingSkeleton } from "../ui/LoadingSkeleton";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 

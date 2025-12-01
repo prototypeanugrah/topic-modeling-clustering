@@ -12,9 +12,13 @@ router = APIRouter(prefix="/visualization", tags=["visualization"])
 
 
 @router.get("/{n_topics}", response_model=VisualizationResponse)
-async def get_visualization(n_topics: int):
+async def get_visualization(n_topics: int, dataset: str = "train"):
     """
     Get UMAP 2D projections for visualization.
+
+    Args:
+        n_topics: Number of topics
+        dataset: Which dataset to visualize (train or test)
 
     Returns pre-computed UMAP coordinates for all documents.
     """
@@ -24,12 +28,18 @@ async def get_visualization(n_topics: int):
             detail=f"n_topics must be between {MIN_TOPICS} and {MAX_TOPICS}"
         )
 
-    projection = load_umap_projection(n_topics)
+    if dataset not in ["train", "test"]:
+        raise HTTPException(
+            status_code=400,
+            detail="dataset must be 'train' or 'test'"
+        )
+
+    projection = load_umap_projection(n_topics, dataset)
 
     if projection is None:
         raise HTTPException(
             status_code=503,
-            detail=f"UMAP projection for {n_topics} topics not available. Run precomputation first."
+            detail=f"UMAP projection for {n_topics} topics ({dataset}) not available. Run precomputation first."
         )
 
     # Round to 4 decimal places to reduce payload size (~30% smaller)
@@ -39,6 +49,7 @@ async def get_visualization(n_topics: int):
         n_topics=n_topics,
         projections=rounded_projections,
         document_ids=list(range(len(projection))),
+        dataset=dataset,
     )
 
 
@@ -48,20 +59,23 @@ async def get_clustered_visualization(request: VisualizationRequest):
     Get UMAP projections with cluster labels.
 
     Combines pre-computed UMAP projections with real-time K-Means clustering.
+    Supports both train and test datasets.
     """
-    projection = load_umap_projection(request.n_topics)
-    distribution = load_doc_topic_distribution(request.n_topics)
+    dataset = request.dataset
+
+    projection = load_umap_projection(request.n_topics, dataset)
+    distribution = load_doc_topic_distribution(request.n_topics, dataset)
 
     if projection is None:
         raise HTTPException(
             status_code=503,
-            detail=f"UMAP projection for {request.n_topics} topics not available. Run precomputation first."
+            detail=f"UMAP projection for {request.n_topics} topics ({dataset}) not available. Run precomputation first."
         )
 
     if distribution is None:
         raise HTTPException(
             status_code=503,
-            detail=f"Distribution for {request.n_topics} topics not available. Run precomputation first."
+            detail=f"Distribution for {request.n_topics} topics ({dataset}) not available. Run precomputation first."
         )
 
     # Perform clustering
@@ -76,4 +90,5 @@ async def get_clustered_visualization(request: VisualizationRequest):
         projections=rounded_projections,
         cluster_labels=result.labels.tolist(),
         document_ids=list(range(len(projection))),
+        dataset=dataset,
     )

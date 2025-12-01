@@ -49,12 +49,19 @@ class TestStatusEndpoint:
         data = response.json()
         assert "complete" in data
         assert "dictionary" in data
-        assert "corpus" in data
-        assert "tokenized_docs" in data
-        assert "coherence_scores" in data
+        assert "corpus_train" in data
+        assert "corpus_test" in data
+        assert "tokenized_train" in data
+        assert "tokenized_test" in data
+        assert "coherence_val" in data
+        assert "coherence_test" in data
+        assert "perplexity_val" in data
+        assert "perplexity_test" in data
         assert "models" in data
-        assert "distributions" in data
-        assert "projections" in data
+        assert "distributions_train" in data
+        assert "distributions_test" in data
+        assert "projections_train" in data
+        assert "projections_test" in data
 
 
 class TestCoherenceEndpoint:
@@ -68,15 +75,27 @@ class TestCoherenceEndpoint:
 
     def test_coherence_returns_data_when_cached(self, client):
         """Should return coherence data when cached."""
-        mock_scores = {2: 0.35, 3: 0.42, 4: 0.38}
-        with patch("backend.api.topics.load_coherence_scores", return_value=mock_scores):
+        mock_val_scores = {2: 0.32, 3: 0.40, 4: 0.36}
+        mock_test_scores = {2: 0.35, 3: 0.42, 4: 0.38}
+        mock_perplexity_val = {2: 100.0, 3: 95.0, 4: 98.0}
+        mock_perplexity_test = {2: 105.0, 3: 92.0, 4: 96.0}
+
+        with patch("backend.api.topics.load_coherence_scores") as mock_coh, \
+             patch("backend.api.topics.load_perplexity_scores") as mock_perp:
+            # Mock returns based on split argument
+            mock_coh.side_effect = lambda split: mock_val_scores if split == "val" else mock_test_scores
+            mock_perp.side_effect = lambda split: mock_perplexity_val if split == "val" else mock_perplexity_test
+
             response = client.get("/api/topics/coherence")
             assert response.status_code == 200
             data = response.json()
             assert "topic_counts" in data
-            assert "coherence_scores" in data
+            assert "coherence_val" in data
+            assert "coherence_test" in data
+            assert "perplexity_val" in data
+            assert "perplexity_test" in data
             assert "optimal_topics" in data
-            assert data["optimal_topics"] == 3  # Highest coherence
+            assert data["optimal_topics"] == 3  # Highest test coherence
 
 
 class TestTopicWordsEndpoint:

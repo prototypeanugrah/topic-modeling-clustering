@@ -54,8 +54,11 @@ export function CoherenceChart({
 
   const selectedIndex = data.topic_counts.indexOf(selectedTopics);
 
-  // Check if perplexity data is available
-  const hasPerplexity = data.perplexity_scores && data.perplexity_scores.length > 0;
+  // Check if validation and test data are available
+  const hasValCoherence = data.coherence_val && data.coherence_val.length > 0;
+  const hasTestCoherence = data.coherence_test && data.coherence_test.length > 0;
+  const hasValPerplexity = data.perplexity_val && data.perplexity_val.length > 0;
+  const hasTestPerplexity = data.perplexity_test && data.perplexity_test.length > 0;
 
   // Show subtle indicator during background revalidation
   const showValidatingIndicator = isValidating && data;
@@ -74,56 +77,98 @@ export function CoherenceChart({
       <div className="flex-1 min-h-0">
         <Plot
           data={[
-            // Coherence score (primary y-axis)
-            {
-              x: data.topic_counts,
-              y: data.coherence_scores,
-              type: "scatter",
-              mode: "lines+markers",
-              marker: { color: "#3b82f6", size: 8 },
-              line: { color: "#3b82f6", width: 2 },
-              name: "Coherence",
-              yaxis: "y",
-            },
-            // Perplexity (secondary y-axis)
-            hasPerplexity
-              ? {
-                  x: data.topic_counts,
-                  y: data.perplexity_scores,
-                  type: "scatter",
-                  mode: "lines+markers",
-                  marker: { color: "#64748b", size: 6 },
-                  line: { color: "#64748b", width: 1, dash: "dash" },
-                  name: "Perplexity",
-                  yaxis: "y2",
-                }
-              : {},
-            // Highlight optimal point (on coherence axis)
-            {
-              x: [data.optimal_topics],
-              y: [data.coherence_scores[data.topic_counts.indexOf(data.optimal_topics)]],
-              type: "scatter",
-              mode: "markers",
-              marker: { color: "#22c55e", size: 14, symbol: "star" },
-              name: `Optimal (k=${data.optimal_topics})`,
-              yaxis: "y",
-            },
-            // Highlight selected point (on coherence axis)
-            selectedIndex >= 0
-              ? {
-                  x: [selectedTopics],
-                  y: [data.coherence_scores[selectedIndex]],
-                  type: "scatter",
-                  mode: "markers",
-                  marker: {
-                    color: "#f97316",
-                    size: 12,
-                    line: { color: "#fff", width: 2 },
+            // Coherence validation (dashed) - primary y-axis
+            ...(hasValCoherence
+              ? [
+                  {
+                    x: data.topic_counts,
+                    y: data.coherence_val,
+                    type: "scatter" as const,
+                    mode: "lines+markers" as const,
+                    marker: { color: "#93c5fd", size: 6 },
+                    line: { color: "#93c5fd", width: 2, dash: "dash" as const },
+                    name: "Coherence (Val)",
+                    yaxis: "y",
                   },
-                  name: `Selected (k=${selectedTopics})`,
-                  yaxis: "y",
-                }
-              : {},
+                ]
+              : []),
+            // Coherence test (solid) - primary y-axis
+            ...(hasTestCoherence
+              ? [
+                  {
+                    x: data.topic_counts,
+                    y: data.coherence_test,
+                    type: "scatter" as const,
+                    mode: "lines+markers" as const,
+                    marker: { color: "#3b82f6", size: 8 },
+                    line: { color: "#3b82f6", width: 2 },
+                    name: "Coherence (Test)",
+                    yaxis: "y",
+                  },
+                ]
+              : []),
+            // Perplexity validation (dashed) - secondary y-axis
+            ...(hasValPerplexity
+              ? [
+                  {
+                    x: data.topic_counts,
+                    y: data.perplexity_val,
+                    type: "scatter" as const,
+                    mode: "lines+markers" as const,
+                    marker: { color: "#cbd5e1", size: 5 },
+                    line: { color: "#cbd5e1", width: 1, dash: "dash" as const },
+                    name: "Perplexity (Val)",
+                    yaxis: "y2",
+                  },
+                ]
+              : []),
+            // Perplexity test (solid) - secondary y-axis
+            ...(hasTestPerplexity
+              ? [
+                  {
+                    x: data.topic_counts,
+                    y: data.perplexity_test,
+                    type: "scatter" as const,
+                    mode: "lines+markers" as const,
+                    marker: { color: "#64748b", size: 6 },
+                    line: { color: "#64748b", width: 1 },
+                    name: "Perplexity (Test)",
+                    yaxis: "y2",
+                  },
+                ]
+              : []),
+            // Highlight optimal point (on test coherence axis)
+            ...(hasTestCoherence
+              ? [
+                  {
+                    x: [data.optimal_topics],
+                    y: [data.coherence_test[data.topic_counts.indexOf(data.optimal_topics)]],
+                    type: "scatter" as const,
+                    mode: "markers" as const,
+                    marker: { color: "#22c55e", size: 14, symbol: "star" },
+                    name: `Optimal (k=${data.optimal_topics})`,
+                    yaxis: "y",
+                  },
+                ]
+              : []),
+            // Highlight selected point (on test coherence axis)
+            ...(selectedIndex >= 0 && hasTestCoherence
+              ? [
+                  {
+                    x: [selectedTopics],
+                    y: [data.coherence_test[selectedIndex]],
+                    type: "scatter" as const,
+                    mode: "markers" as const,
+                    marker: {
+                      color: "#f97316",
+                      size: 12,
+                      line: { color: "#fff", width: 2 },
+                    },
+                    name: `Selected (k=${selectedTopics})`,
+                    yaxis: "y",
+                  },
+                ]
+              : []),
           ]}
           layout={{
             autosize: true,

@@ -16,21 +16,32 @@ class StatusResponse(BaseModel):
 
     complete: bool
     dictionary: bool
-    corpus: bool
-    tokenized_docs: bool
-    coherence_scores: bool
+    corpus_train: bool
+    corpus_test: bool
+    tokenized_train: bool
+    tokenized_test: bool
+    coherence_val: bool
+    coherence_test: bool
+    perplexity_val: bool
+    perplexity_test: bool
     models: dict[int, bool]
-    distributions: dict[int, bool]
-    projections: dict[int, bool]
+    distributions_train: dict[int, bool]
+    distributions_test: dict[int, bool]
+    projections_train: dict[int, bool]
+    projections_test: dict[int, bool]
 
 
 class CoherenceResponse(BaseModel):
-    """Response for coherence scores endpoint."""
+    """Response for coherence scores endpoint with val and test scores."""
 
     topic_counts: list[int]
-    coherence_scores: list[float]
-    perplexity_scores: list[float]
-    optimal_topics: int
+    # Validation scores (averaged from 5-fold CV)
+    coherence_val: list[float]
+    perplexity_val: list[float]
+    # Test scores (final evaluation on held-out set)
+    coherence_test: list[float]
+    perplexity_test: list[float]
+    optimal_topics: int  # Based on test coherence
 
 
 class TopicWord(BaseModel):
@@ -74,6 +85,7 @@ class VisualizationResponse(BaseModel):
     n_topics: int
     projections: list[list[float]]  # [[x, y], ...]
     document_ids: list[int]
+    dataset: str = "train"  # "train" or "test"
 
 
 class ClusteredVisualizationResponse(BaseModel):
@@ -84,6 +96,7 @@ class ClusteredVisualizationResponse(BaseModel):
     projections: list[list[float]]  # [[x, y], ...]
     cluster_labels: list[int]
     document_ids: list[int]
+    dataset: str = "train"  # "train" or "test"
 
 
 class PrecomputeProgressResponse(BaseModel):
@@ -102,3 +115,42 @@ class TopicBundleResponse(BaseModel):
     words: TopicWordsResponse
     cluster_metrics: ClusterMetricsResponse
     visualization: ClusteredVisualizationResponse
+
+
+class StageStats(BaseModel):
+    """Statistics for one preprocessing stage."""
+
+    n_documents: int
+    avg_length: float
+    median_length: float
+    min_length: int
+    max_length: int
+    std_length: float
+    empty_count: int
+    empty_pct: float
+    percentiles: dict[int, float]  # {10, 25, 50, 75, 90, 95, 99}
+    # For histogram (binned data to reduce payload)
+    histogram_bins: list[float]  # bin edges
+    histogram_counts: list[int]  # counts per bin
+
+
+class EDAResponse(BaseModel):
+    """Full EDA response with 3 preprocessing stages."""
+
+    # Stage 1: Raw documents (character lengths)
+    raw_train: StageStats
+    raw_test: StageStats
+
+    # Stage 2: Tokenized (before filter_extremes)
+    vocab_before_filter: int
+    tokenized_train: StageStats
+    tokenized_test: StageStats
+
+    # Stage 3: Filtered (corpus for LDA)
+    vocab_after_filter: int
+    filtered_train: StageStats
+    filtered_test: StageStats
+
+    # Summary metrics
+    vocab_reduction_pct: float
+    token_reduction_pct: float
