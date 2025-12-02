@@ -57,8 +57,6 @@ export function CoherenceChart({
   // Check if validation and test data are available
   const hasValCoherence = data.coherence_val && data.coherence_val.length > 0;
   const hasTestCoherence = data.coherence_test && data.coherence_test.length > 0;
-  const hasValPerplexity = data.perplexity_val && data.perplexity_val.length > 0;
-  const hasTestPerplexity = data.perplexity_test && data.perplexity_test.length > 0;
 
   // Show subtle indicator during background revalidation
   const showValidatingIndicator = isValidating && data;
@@ -107,36 +105,6 @@ export function CoherenceChart({
                   },
                 ]
               : []),
-            // Perplexity validation (dashed) - secondary y-axis
-            ...(hasValPerplexity
-              ? [
-                  {
-                    x: data.topic_counts,
-                    y: data.perplexity_val,
-                    type: "scatter" as const,
-                    mode: "lines+markers" as const,
-                    marker: { color: "#cbd5e1", size: 5 },
-                    line: { color: "#cbd5e1", width: 1, dash: "dash" as const },
-                    name: "Perplexity (Val)",
-                    yaxis: "y2",
-                  },
-                ]
-              : []),
-            // Perplexity test (solid) - secondary y-axis
-            ...(hasTestPerplexity
-              ? [
-                  {
-                    x: data.topic_counts,
-                    y: data.perplexity_test,
-                    type: "scatter" as const,
-                    mode: "lines+markers" as const,
-                    marker: { color: "#64748b", size: 6 },
-                    line: { color: "#64748b", width: 1 },
-                    name: "Perplexity (Test)",
-                    yaxis: "y2",
-                  },
-                ]
-              : []),
             // Highlight optimal point (on test coherence axis)
             ...(hasTestCoherence
               ? [
@@ -181,11 +149,6 @@ export function CoherenceChart({
             yaxis: {
               title: { text: "Coherence Score" },
               side: "left",
-            },
-            yaxis2: {
-              title: { text: "Perplexity" },
-              side: "right",
-              overlaying: "y",
             },
             showlegend: true,
             legend: {

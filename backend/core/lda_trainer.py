@@ -8,12 +8,14 @@ from gensim.models import LdaModel
 from gensim.models.coherencemodel import CoherenceModel
 
 from backend.config import (
+    FILTER_NO_ABOVE,
+    FILTER_NO_BELOW,
+    LDA_ALPHA,
     LDA_CHUNKSIZE,
+    LDA_ETA,
     LDA_ITERATIONS,
     LDA_PASSES,
     LDA_RANDOM_STATE,
-    MAX_DOC_FREQ_RATIO,
-    MIN_DOC_FREQ,
 )
 
 
@@ -39,8 +41,9 @@ def create_dictionary(tokenized_docs: list[list[str]]) -> corpora.Dictionary:
     """
     dictionary = corpora.Dictionary(tokenized_docs)
 
-    # Filter extremes
-    dictionary.filter_extremes(no_below=MIN_DOC_FREQ, no_above=MAX_DOC_FREQ_RATIO)
+    # Filter extremes: remove tokens appearing in fewer than FILTER_NO_BELOW docs
+    # or more than FILTER_NO_ABOVE fraction of docs
+    dictionary.filter_extremes(no_below=FILTER_NO_BELOW, no_above=FILTER_NO_ABOVE)
 
     return dictionary
 
@@ -69,6 +72,8 @@ def train_lda(
     iterations: int = LDA_ITERATIONS,
     chunksize: int = LDA_CHUNKSIZE,
     random_state: int = LDA_RANDOM_STATE,
+    alpha: str | float | list[float] = LDA_ALPHA,
+    eta: str | float | list[float] = LDA_ETA,
 ) -> LdaModel:
     """
     Train an LDA model.
@@ -81,6 +86,8 @@ def train_lda(
         iterations: Maximum iterations per document
         chunksize: Number of documents per chunk
         random_state: Random seed for reproducibility
+        alpha: Document-topic density ('auto', 'symmetric', 'asymmetric', or float/list)
+        eta: Topic-word density ('auto', 'symmetric', or float/list)
 
     Returns:
         Trained LDA model
@@ -93,6 +100,8 @@ def train_lda(
         iterations=iterations,
         chunksize=chunksize,
         random_state=random_state,
+        alpha=alpha,
+        eta=eta,
         per_word_topics=False,
     )
     return model
@@ -150,28 +159,6 @@ def calculate_coherence(
         coherence=coherence_type,
     )
     return coherence_model.get_coherence()
-
-
-def calculate_perplexity(
-    model: LdaModel,
-    corpus: list[list[tuple[int, int]]],
-) -> float:
-    """
-    Calculate perplexity score for LDA model.
-
-    Perplexity measures how well the model predicts held-out data.
-    Lower perplexity indicates better generalization.
-
-    Args:
-        model: Trained LDA model
-        corpus: Bag-of-words corpus
-
-    Returns:
-        Perplexity score (lower is better)
-    """
-    log_perp = model.log_perplexity(corpus)  # returns the per-word bound score
-    # Convert log perplexity to perplexity: perplexity = np.exp2(-log_perplexity)
-    return np.exp2(-log_perp)
 
 
 def get_topic_words(
@@ -239,7 +226,6 @@ def train_lda_full(
 class CVFoldResult(NamedTuple):
     """Result from a single CV fold."""
     fold: int
-    perplexity: float
     coherence: float
 
 
@@ -247,44 +233,35 @@ class CVResult(NamedTuple):
     """Aggregated cross-validation results."""
     num_topics: int
     fold_results: list[CVFoldResult]
-    avg_perplexity: float
     avg_coherence: float
-    std_perplexity: float
     std_coherence: float
 
 
 def train_lda_cv_fold(
     train_corpus: list[list[tuple[int, int]]],
     train_tokenized: list[list[str]],
-    val_corpus: list[list[tuple[int, int]]],
     dictionary: corpora.Dictionary,
     num_topics: int,
-) -> tuple[float, float]:
+) -> float:
     """
     Train LDA on one CV fold and evaluate.
 
     Args:
         train_corpus: Training corpus (bag-of-words)
         train_tokenized: Training tokenized docs (for coherence)
-        val_corpus: Validation corpus (bag-of-words)
         dictionary: Frozen dictionary (built from full train set)
         num_topics: Number of topics
 
     Returns:
-        Tuple of (perplexity, coherence)
-        - Perplexity: measured on validation set (generalization)
-        - Coherence: measured on training set (topic quality needs sufficient co-occurrence data)
+        Coherence score measured on training set
     """
     # Train on fold's training set
     model = train_lda(train_corpus, dictionary, num_topics)
 
-    # Perplexity on validation set (measures generalization)
-    perplexity = calculate_perplexity(model, val_corpus)
-
     # Coherence on training set (needs sufficient data for word co-occurrence stats)
     coherence = calculate_coherence(model, train_tokenized, dictionary)
 
-    return perplexity, coherence
+    return coherence
 
 
 def run_cross_validation(
@@ -317,7 +294,6 @@ def run_cross_validation(
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
 
     fold_results = []
-    perplexities = []
     coherences = []
 
     folds_iter = enumerate(kf.split(tokenized_docs))
@@ -329,38 +305,32 @@ def run_cross_validation(
             unit="fold",
         )
 
-    for fold_idx, (train_idx, val_idx) in folds_iter:
+    for fold_idx, (train_idx, _) in folds_iter:
         # Split data
         train_corpus_fold = [corpus[i] for i in train_idx]
         train_tokenized_fold = [tokenized_docs[i] for i in train_idx]
-        val_corpus_fold = [corpus[i] for i in val_idx]
 
         # Train and evaluate
-        perplexity, coherence = train_lda_cv_fold(
+        coherence = train_lda_cv_fold(
             train_corpus_fold,
             train_tokenized_fold,
-            val_corpus_fold,
             dictionary,
             num_topics,
         )
 
         fold_results.append(CVFoldResult(
             fold=fold_idx + 1,
-            perplexity=perplexity,
             coherence=coherence,
         ))
-        perplexities.append(perplexity)
         coherences.append(coherence)
 
         # Update progress bar with latest metrics
         if show_progress and hasattr(folds_iter, 'set_postfix'):
-            folds_iter.set_postfix(coh=f"{coherence:.4f}", perp=f"{perplexity:.1f}")
+            folds_iter.set_postfix(coh=f"{coherence:.4f}")
 
     return CVResult(
         num_topics=num_topics,
         fold_results=fold_results,
-        avg_perplexity=float(np.mean(perplexities)),
         avg_coherence=float(np.mean(coherences)),
-        std_perplexity=float(np.std(perplexities)),
         std_coherence=float(np.std(coherences)),
     )

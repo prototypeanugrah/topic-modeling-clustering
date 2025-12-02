@@ -55,8 +55,6 @@ class TestStatusEndpoint:
         assert "tokenized_test" in data
         assert "coherence_val" in data
         assert "coherence_test" in data
-        assert "perplexity_val" in data
-        assert "perplexity_test" in data
         assert "models" in data
         assert "distributions_train" in data
         assert "distributions_test" in data
@@ -77,14 +75,10 @@ class TestCoherenceEndpoint:
         """Should return coherence data when cached."""
         mock_val_scores = {2: 0.32, 3: 0.40, 4: 0.36}
         mock_test_scores = {2: 0.35, 3: 0.42, 4: 0.38}
-        mock_perplexity_val = {2: 100.0, 3: 95.0, 4: 98.0}
-        mock_perplexity_test = {2: 105.0, 3: 92.0, 4: 96.0}
 
-        with patch("backend.api.topics.load_coherence_scores") as mock_coh, \
-             patch("backend.api.topics.load_perplexity_scores") as mock_perp:
+        with patch("backend.api.topics.load_coherence_scores") as mock_coh:
             # Mock returns based on split argument
             mock_coh.side_effect = lambda split: mock_val_scores if split == "val" else mock_test_scores
-            mock_perp.side_effect = lambda split: mock_perplexity_val if split == "val" else mock_perplexity_test
 
             response = client.get("/api/topics/coherence")
             assert response.status_code == 200
@@ -92,8 +86,6 @@ class TestCoherenceEndpoint:
             assert "topic_counts" in data
             assert "coherence_val" in data
             assert "coherence_test" in data
-            assert "perplexity_val" in data
-            assert "perplexity_test" in data
             assert "optimal_topics" in data
             assert data["optimal_topics"] == 3  # Highest test coherence
 

@@ -5,7 +5,6 @@ from fastapi.responses import HTMLResponse
 
 from backend.cache.manager import (
     load_coherence_scores,
-    load_perplexity_scores,
     load_lda_model,
     load_doc_topic_distribution,
     load_umap_projection,
@@ -32,18 +31,16 @@ CACHE_HEADERS = {"Cache-Control": "public, max-age=3600"}
 @router.get("/coherence", response_model=CoherenceResponse)
 async def get_coherence_scores(response: Response):
     """
-    Get coherence and perplexity scores for all topic counts.
+    Get coherence scores for all topic counts.
 
     Returns both validation (5-fold CV averaged) and test (held-out) scores.
     Used for the "optimal number of topics" chart.
     """
     # Load validation scores (from CV)
     coherence_val = load_coherence_scores("val")
-    perplexity_val = load_perplexity_scores("val")
 
     # Load test scores (final evaluation)
     coherence_test = load_coherence_scores("test")
-    perplexity_test = load_perplexity_scores("test")
 
     if coherence_test is None:
         raise HTTPException(
@@ -58,9 +55,7 @@ async def get_coherence_scores(response: Response):
 
     # Build response arrays
     coherence_val_values = [coherence_val.get(k, 0) for k in topic_counts] if coherence_val else []
-    perplexity_val_values = [perplexity_val.get(k, 0) for k in topic_counts] if perplexity_val else []
     coherence_test_values = [coherence_test[k] for k in topic_counts]
-    perplexity_test_values = [perplexity_test.get(k, 0) for k in topic_counts] if perplexity_test else []
 
     # Find optimal based on test coherence
     optimal_topics = max(coherence_test, key=coherence_test.get)
@@ -68,9 +63,7 @@ async def get_coherence_scores(response: Response):
     return CoherenceResponse(
         topic_counts=topic_counts,
         coherence_val=coherence_val_values,
-        perplexity_val=perplexity_val_values,
         coherence_test=coherence_test_values,
-        perplexity_test=perplexity_test_values,
         optimal_topics=optimal_topics,
     )
 

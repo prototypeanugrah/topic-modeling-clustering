@@ -101,9 +101,11 @@ export function Dashboard() {
     );
   }
 
-  // Derive min/max from coherence data or use defaults
+  // Derive min/max from backend data or use defaults while loading
   const minTopics = coherenceData ? Math.min(...coherenceData.topic_counts) : 2;
   const maxTopics = coherenceData ? Math.max(...coherenceData.topic_counts) : 20;
+  const minClusters = clusterMetricsData ? Math.min(...clusterMetricsData.cluster_counts) : 2;
+  const maxClusters = clusterMetricsData ? Math.max(...clusterMetricsData.cluster_counts) : 15;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -143,6 +145,8 @@ export function Dashboard() {
                 optimalClusters={clusterMetricsData?.elbow_point ?? undefined}
                 minTopics={minTopics}
                 maxTopics={maxTopics}
+                minClusters={minClusters}
+                maxClusters={maxClusters}
               />
             )}
           </div>

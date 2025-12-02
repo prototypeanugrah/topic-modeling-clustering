@@ -198,37 +198,6 @@ def load_coherence_scores(split: str = "test") -> dict[int, float] | None:
     return None
 
 
-def save_perplexity_scores(scores: dict[int, float], split: str = "test") -> Path:
-    """Save perplexity scores to cache.
-
-    Args:
-        scores: Dictionary mapping topic count to perplexity score
-        split: 'val' (averaged from CV) or 'test' (final evaluation)
-    """
-    ensure_cache_dirs()
-    path = METRICS_DIR / f"perplexity_{split}.json"
-    # Convert int keys to strings for JSON
-    json_scores = {str(k): v for k, v in scores.items()}
-    with open(path, "w") as f:
-        json.dump(json_scores, f, indent=2)
-    return path
-
-
-def load_perplexity_scores(split: str = "test") -> dict[int, float] | None:
-    """Load perplexity scores from cache.
-
-    Args:
-        split: 'val' (averaged from CV) or 'test' (final evaluation)
-    """
-    path = METRICS_DIR / f"perplexity_{split}.json"
-    if path.exists():
-        with open(path, "r") as f:
-            json_scores = json.load(f)
-        # Convert string keys back to ints
-        return {int(k): v for k, v in json_scores.items()}
-    return None
-
-
 def is_cache_complete() -> bool:
     """Check if all precomputed artifacts exist."""
     # Check dictionary
@@ -253,11 +222,9 @@ def is_cache_complete() -> bool:
             if not (PROJECTIONS_DIR / f"umap_{dataset}_k{n}.npy").exists():
                 return False
 
-    # Check val and test coherence/perplexity scores
+    # Check val and test coherence scores
     for split in ["val", "test"]:
         if not (METRICS_DIR / f"coherence_{split}.json").exists():
-            return False
-        if not (METRICS_DIR / f"perplexity_{split}.json").exists():
             return False
 
     return True
@@ -274,8 +241,6 @@ def get_cache_status() -> dict[str, Any]:
         "tokenized_test": (MODELS_DIR / "tokenized_test.pkl").exists(),
         "coherence_val": (METRICS_DIR / "coherence_val.json").exists(),
         "coherence_test": (METRICS_DIR / "coherence_test.json").exists(),
-        "perplexity_val": (METRICS_DIR / "perplexity_val.json").exists(),
-        "perplexity_test": (METRICS_DIR / "perplexity_test.json").exists(),
         "models": {},
         "distributions_train": {},
         "distributions_test": {},
@@ -335,6 +300,36 @@ def save_eda_stats(stats: dict) -> Path:
 def load_eda_stats() -> dict | None:
     """Load EDA statistics from cache."""
     path = METRICS_DIR / "eda_stats.json"
+    if path.exists():
+        with open(path, "r") as f:
+            return json.load(f)
+    return None
+
+
+def save_document_labels(labels: list[str], dataset: str = "train") -> Path:
+    """Save newsgroup labels for filtered documents.
+
+    Args:
+        labels: List of newsgroup label strings (e.g., ["alt.atheism", "sci.space", ...])
+        dataset: 'train' or 'test'
+    """
+    ensure_cache_dirs()
+    path = MODELS_DIR / f"labels_{dataset}.json"
+    with open(path, "w") as f:
+        json.dump(labels, f)
+    return path
+
+
+def load_document_labels(dataset: str = "train") -> list[str] | None:
+    """Load newsgroup labels for filtered documents.
+
+    Args:
+        dataset: 'train' or 'test'
+
+    Returns:
+        List of newsgroup label strings, or None if not cached
+    """
+    path = MODELS_DIR / f"labels_{dataset}.json"
     if path.exists():
         with open(path, "r") as f:
             return json.load(f)

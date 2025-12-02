@@ -8,19 +8,21 @@ interface DatasetOverviewProps {
   isValidating?: boolean;
 }
 
-type Stage = "raw" | "tokenized" | "filtered";
+type Stage = "raw" | "tokenized" | "filtered" | "final";
 type Dataset = "train" | "test";
 
 const STAGE_LABELS: Record<Stage, string> = {
-  raw: "Raw (chars)",
+  raw: "Raw",
   tokenized: "Tokenized",
   filtered: "Filtered",
+  final: "Final",
 };
 
 const STAGE_COLORS: Record<Stage, string> = {
   raw: "#94a3b8",
   tokenized: "#60a5fa",
   filtered: "#34d399",
+  final: "#f472b6",
 };
 
 export function DatasetOverview({
@@ -28,7 +30,7 @@ export function DatasetOverview({
   loading,
   isValidating,
 }: DatasetOverviewProps) {
-  const [selectedStage, setSelectedStage] = useState<Stage>("filtered");
+  const [selectedStage, setSelectedStage] = useState<Stage>("final");
   const [selectedDataset, setSelectedDataset] = useState<Dataset>("train");
 
   // Loading skeleton
@@ -91,41 +93,93 @@ export function DatasetOverview({
         Dataset Overview
       </h3>
 
-      {/* Summary Cards Row */}
+      {/* Summary Cards Row - Dynamic based on selected stage */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {/* Train Documents */}
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
           <div className="text-xs font-medium text-blue-600 uppercase tracking-wide">Train Docs</div>
           <div className="text-2xl font-bold text-blue-900 mt-1">
-            {formatNum(data.filtered_train.n_documents)}
+            {formatNum(getStats(selectedStage, "train").n_documents)}
           </div>
+          {selectedStage === "final" && data.train_docs_removed > 0 ? (
+            <div className="text-xs text-red-600 mt-0.5">
+              -{formatNum(data.train_docs_removed)} removed
+            </div>
+          ) : (
+            <div className="text-xs text-blue-600 mt-0.5">
+              {getStats(selectedStage, "train").empty_count} empty
+            </div>
+          )}
         </div>
 
         {/* Test Documents */}
         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4">
           <div className="text-xs font-medium text-purple-600 uppercase tracking-wide">Test Docs</div>
           <div className="text-2xl font-bold text-purple-900 mt-1">
-            {formatNum(data.filtered_test.n_documents)}
+            {formatNum(getStats(selectedStage, "test").n_documents)}
           </div>
+          {selectedStage === "final" && data.test_docs_removed > 0 ? (
+            <div className="text-xs text-red-600 mt-0.5">
+              -{formatNum(data.test_docs_removed)} removed
+            </div>
+          ) : (
+            <div className="text-xs text-purple-600 mt-0.5">
+              {getStats(selectedStage, "test").empty_count} empty
+            </div>
+          )}
         </div>
 
-        {/* Vocabulary */}
+        {/* Vocabulary - shows before/after based on stage */}
         <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-4">
           <div className="text-xs font-medium text-amber-600 uppercase tracking-wide">Vocabulary</div>
-          <div className="text-lg font-bold text-amber-900 mt-1">
-            {formatNum(data.vocab_before_filter)} → {formatNum(data.vocab_after_filter)}
-          </div>
-          <div className="text-xs text-amber-600 mt-0.5">
-            -{formatPct(data.vocab_reduction_pct)}
-          </div>
+          {selectedStage === "raw" || selectedStage === "tokenized" ? (
+            <>
+              <div className="text-2xl font-bold text-amber-900 mt-1">
+                {formatNum(data.vocab_before_filter)}
+              </div>
+              <div className="text-xs text-amber-600 mt-0.5">
+                before filtering
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-2xl font-bold text-amber-900 mt-1">
+                {formatNum(data.vocab_after_filter)}
+              </div>
+              <div className="text-xs text-amber-600 mt-0.5">
+                -{formatPct(data.vocab_reduction_pct)} from {formatNum(data.vocab_before_filter)}
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Token Reduction */}
+        {/* Empty Docs / Min Tokens */}
         <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg p-4">
-          <div className="text-xs font-medium text-emerald-600 uppercase tracking-wide">Token Reduction</div>
-          <div className="text-2xl font-bold text-emerald-900 mt-1">
-            {formatPct(data.token_reduction_pct)}
-          </div>
+          {selectedStage === "final" ? (
+            <>
+              <div className="text-xs font-medium text-emerald-600 uppercase tracking-wide">Min Tokens</div>
+              <div className="text-2xl font-bold text-emerald-900 mt-1">
+                {data.min_tokens_threshold}
+              </div>
+              <div className="text-xs text-emerald-600 mt-0.5">
+                filter threshold
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-xs font-medium text-emerald-600 uppercase tracking-wide">Empty Docs</div>
+              <div className="text-2xl font-bold text-emerald-900 mt-1">
+                {getStats(selectedStage, "train").empty_count + getStats(selectedStage, "test").empty_count}
+              </div>
+              <div className="text-xs text-emerald-600 mt-0.5">
+                {formatPct(
+                  ((getStats(selectedStage, "train").empty_count + getStats(selectedStage, "test").empty_count) /
+                    (getStats(selectedStage, "train").n_documents + getStats(selectedStage, "test").n_documents)) *
+                    100
+                )} of total
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -135,7 +189,7 @@ export function DatasetOverview({
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500">Stage:</span>
           <div className="flex rounded-lg overflow-hidden border border-gray-200">
-            {(["raw", "tokenized", "filtered"] as Stage[]).map((stage) => (
+            {(["raw", "tokenized", "filtered", "final"] as Stage[]).map((stage) => (
               <button
                 key={stage}
                 onClick={() => setSelectedStage(stage)}
@@ -172,6 +226,32 @@ export function DatasetOverview({
         </div>
       </div>
 
+      {/* Stage Description */}
+      <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-100">
+        <p className="text-xs text-gray-600">
+          {selectedStage === "raw" && (
+            <>
+              <span className="font-semibold">Raw:</span> Original documents with whitespace-split token counts. All {formatNum(data.raw_train.n_documents + data.raw_test.n_documents)} documents included.
+            </>
+          )}
+          {selectedStage === "tokenized" && (
+            <>
+              <span className="font-semibold">Tokenized:</span> After preprocessing (tokenization, lemmatization, stopword removal). Same document count, but token distribution changes significantly.
+            </>
+          )}
+          {selectedStage === "filtered" && (
+            <>
+              <span className="font-semibold">Filtered:</span> After dictionary filter_extremes (no_below={data.filter_no_below}, no_above={data.filter_no_above}). Vocabulary reduced by {formatPct(data.vocab_reduction_pct)}, some docs may have 0 tokens.
+            </>
+          )}
+          {selectedStage === "final" && (
+            <>
+              <span className="font-semibold">Final:</span> After removing documents with {"<"}{data.min_tokens_threshold} tokens. {formatNum(data.train_docs_removed + data.test_docs_removed)} documents removed ({formatNum(data.train_docs_removed)} train, {formatNum(data.test_docs_removed)} test).
+            </>
+          )}
+        </p>
+      </div>
+
       {/* Content Grid: Histogram + Stats Table */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Histogram */}
@@ -187,10 +267,7 @@ export function DatasetOverview({
                 marker: {
                   color: STAGE_COLORS[selectedStage],
                 },
-                hovertemplate:
-                  selectedStage === "raw"
-                    ? "%{x:.0f} chars: %{y} docs<extra></extra>"
-                    : "%{x:.0f} tokens: %{y} docs<extra></extra>",
+                hovertemplate: "%{x:.0f} tokens: %{y} docs<extra></extra>",
               },
             ]}
             layout={{
@@ -199,7 +276,7 @@ export function DatasetOverview({
               margin: { l: 50, r: 20, t: 30, b: 50 },
               xaxis: {
                 title: {
-                  text: selectedStage === "raw" ? "Document Length (characters)" : "Document Length (tokens)",
+                  text: "Document Length (tokens)",
                 },
               },
               yaxis: {
@@ -222,17 +299,34 @@ export function DatasetOverview({
               <thead>
                 <tr className="text-xs text-gray-500 uppercase">
                   <th className="text-left pb-2">Metric</th>
-                  <th className="text-right pb-2">Raw (chars)</th>
+                  <th className="text-right pb-2">Raw</th>
                   <th className="text-right pb-2">Tok</th>
                   <th className="text-right pb-2">Filt</th>
+                  <th className="text-right pb-2">Final</th>
                 </tr>
               </thead>
               <tbody className="text-gray-700">
+                {/* Document count row */}
+                <tr className="border-t border-gray-200 bg-gray-50">
+                  <td className="py-1.5 font-semibold">Docs</td>
+                  <td className="py-1.5 text-right font-mono text-xs font-semibold">
+                    {formatNum(getStats("raw", selectedDataset).n_documents)}
+                  </td>
+                  <td className="py-1.5 text-right font-mono text-xs font-semibold">
+                    {formatNum(getStats("tokenized", selectedDataset).n_documents)}
+                  </td>
+                  <td className="py-1.5 text-right font-mono text-xs font-semibold">
+                    {formatNum(getStats("filtered", selectedDataset).n_documents)}
+                  </td>
+                  <td className="py-1.5 text-right font-mono text-xs font-semibold text-pink-600">
+                    {formatNum(getStats("final", selectedDataset).n_documents)}
+                  </td>
+                </tr>
                 {[
-                  { label: "Mean", key: "avg_length" },
-                  { label: "Median", key: "median_length" },
-                  { label: "Min", key: "min_length" },
-                  { label: "Max", key: "max_length" },
+                  { label: "Mean", key: "mean" },
+                  { label: "Median", key: "median" },
+                  { label: "Min", key: "min" },
+                  { label: "Max", key: "max" },
                   { label: "Empty", key: "empty_count" },
                 ].map(({ label, key }) => (
                   <tr key={key} className="border-t border-gray-200">
@@ -245,6 +339,9 @@ export function DatasetOverview({
                     </td>
                     <td className="py-1.5 text-right font-mono text-xs">
                       {formatStatValue(getStats("filtered", selectedDataset)[key as keyof StageStats] as number, key)}
+                    </td>
+                    <td className="py-1.5 text-right font-mono text-xs">
+                      {formatStatValue(getStats("final", selectedDataset)[key as keyof StageStats] as number, key)}
                     </td>
                   </tr>
                 ))}
@@ -261,7 +358,7 @@ function formatStatValue(value: number, key: string): string {
   if (key === "empty_count") {
     return value.toString();
   }
-  if (key === "avg_length" || key === "median_length") {
+  if (key === "mean" || key === "median") {
     return value.toFixed(1);
   }
   return value.toLocaleString();

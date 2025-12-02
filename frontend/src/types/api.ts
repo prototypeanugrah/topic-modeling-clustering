@@ -14,8 +14,6 @@ export interface StatusResponse {
   tokenized_test: boolean;
   coherence_val: boolean;
   coherence_test: boolean;
-  perplexity_val: boolean;
-  perplexity_test: boolean;
   models: Record<number, boolean>;
   distributions_train: Record<number, boolean>;
   distributions_test: Record<number, boolean>;
@@ -27,10 +25,8 @@ export interface CoherenceResponse {
   topic_counts: number[];
   // Validation scores (averaged from 5-fold CV)
   coherence_val: number[];
-  perplexity_val: number[];
   // Test scores (final evaluation on held-out set)
   coherence_test: number[];
-  perplexity_test: number[];
   optimal_topics: number; // Based on test coherence
 }
 
@@ -74,6 +70,11 @@ export interface VisualizationResponse {
   dataset: "train" | "test";
 }
 
+export interface DocumentTopicInfo {
+  topic_id: number;
+  probability: number;
+}
+
 export interface ClusteredVisualizationResponse {
   n_topics: number;
   n_clusters: number;
@@ -81,6 +82,11 @@ export interface ClusteredVisualizationResponse {
   cluster_labels: number[];
   document_ids: number[];
   dataset: "train" | "test";
+
+  // Optional tooltip enrichment fields
+  newsgroup_labels?: string[]; // Original 20 newsgroups labels
+  top_topics?: DocumentTopicInfo[][]; // Top 3 topics per document
+  dominant_topic_words?: string[][]; // Top 5 words from dominant topic
 }
 
 export interface PrecomputeProgressResponse {
@@ -101,34 +107,42 @@ export interface TopicBundleResponse {
 // EDA (Exploratory Data Analysis) types
 export interface StageStats {
   n_documents: number;
-  avg_length: number;
-  median_length: number;
-  min_length: number;
-  max_length: number;
-  std_length: number;
+  mean: number;
+  median: number;
+  min: number;
+  max: number;
+  std: number;
   empty_count: number;
   empty_pct: number;
-  percentiles: Record<number, number>;
+  percentiles: Record<string, number>;
   histogram_bins: number[];
   histogram_counts: number[];
 }
 
 export interface EDAResponse {
-  // Stage 1: Raw documents (character lengths)
+  // Stage 1: Raw documents (token counts via whitespace split)
   raw_train: StageStats;
   raw_test: StageStats;
 
-  // Stage 2: Tokenized (before filter_extremes)
+  // Stage 2: Tokenized (after preprocessing, before filter_extremes)
   vocab_before_filter: number;
   tokenized_train: StageStats;
   tokenized_test: StageStats;
 
-  // Stage 3: Filtered (corpus for LDA)
+  // Stage 3: After filter_extremes
   vocab_after_filter: number;
   filtered_train: StageStats;
   filtered_test: StageStats;
-
-  // Summary metrics
   vocab_reduction_pct: number;
-  token_reduction_pct: number;
+
+  // Stage 4: After document filtering (final corpus)
+  final_train: StageStats;
+  final_test: StageStats;
+  min_tokens_threshold: number;
+  train_docs_removed: number;
+  test_docs_removed: number;
+
+  // Filter settings used
+  filter_no_below: number;
+  filter_no_above: number;
 }
