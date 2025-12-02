@@ -17,9 +17,11 @@ PYLDAVIS_DIR = CACHE_DIR / "pyldavis"
 MIN_TOPICS = 2
 MAX_TOPICS = 20
 LDA_PASSES = 10
-LDA_ITERATIONS = 300
+LDA_ITERATIONS = 5000
 LDA_CHUNKSIZE = 11000
 LDA_RANDOM_STATE = 42
+LDA_ALPHA = "auto"  # Document-topic density ('auto', 'symmetric', or float)
+LDA_ETA = "auto"  # Topic-word density ('auto', 'symmetric', or float)
 
 # Clustering settings
 MIN_CLUSTERS = 2

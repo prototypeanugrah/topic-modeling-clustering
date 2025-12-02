@@ -31,7 +31,6 @@ from backend.cache.manager import (
     load_dictionary,
     load_doc_topic_distribution,
     load_lda_model,
-    load_perplexity_scores,
     load_tokenized_docs,
     load_umap_projection,
     save_coherence_scores,
@@ -39,7 +38,6 @@ from backend.cache.manager import (
     save_dictionary,
     save_doc_topic_distribution,
     save_lda_model,
-    save_perplexity_scores,
     save_pyldavis_html,
     save_tokenized_docs,
     save_umap_projection,
@@ -48,7 +46,6 @@ from backend.config import MAX_TOPICS, MIN_TOPICS
 from backend.core.data_loader import load_test_data, load_train_data
 from backend.core.lda_trainer import (
     calculate_coherence,
-    calculate_perplexity,
     create_corpus,
     create_dictionary,
     get_doc_topic_distribution,
@@ -214,17 +211,12 @@ def main():
 
         # Load existing val scores if any
         coherence_val = load_coherence_scores("val") or {}
-        perplexity_val = load_perplexity_scores("val") or {}
 
         for num_topics in range(min_topics, max_topics + 1):
             # Skip if already computed
-            if (
-                num_topics in coherence_val
-                and num_topics in perplexity_val
-                and not args.force
-            ):
+            if num_topics in coherence_val and not args.force:
                 print(
-                    f"      k={num_topics}: cached (val_coh={coherence_val[num_topics]:.4f}, val_perp={perplexity_val[num_topics]:.2f})"
+                    f"      k={num_topics}: cached (val_coh={coherence_val[num_topics]:.4f})"
                 )
                 continue
 
@@ -245,17 +237,14 @@ def main():
             )
 
             coherence_val[num_topics] = cv_result.avg_coherence
-            perplexity_val[num_topics] = cv_result.avg_perplexity
 
             elapsed = time.time() - step_start
             print(
-                f"val_coh={cv_result.avg_coherence:.4f}±{cv_result.std_coherence:.4f}, "
-                f"val_perp={cv_result.avg_perplexity:.2f}±{cv_result.std_perplexity:.2f} ({elapsed:.1f}s)"
+                f"val_coh={cv_result.avg_coherence:.4f}±{cv_result.std_coherence:.4f} ({elapsed:.1f}s)"
             )
 
         # Save validation scores
         save_coherence_scores(coherence_val, "val")
-        save_perplexity_scores(perplexity_val, "val")
     else:
         print("\n[5/7] Skipping Cross-Validation...")
 
@@ -269,7 +258,6 @@ def main():
 
     # Load existing test scores if any
     coherence_test = load_coherence_scores("test") or {}
-    perplexity_test = load_perplexity_scores("test") or {}
     models_trained = 0
     models_skipped = 0
 
@@ -284,12 +272,11 @@ def main():
             and existing_train_dist is not None
             and existing_test_dist is not None
             and num_topics in coherence_test
-            and num_topics in perplexity_test
         )
 
         if all_exist and not args.force:
             print(
-                f"      k={num_topics}: cached (test_coh={coherence_test[num_topics]:.4f}, test_perp={perplexity_test[num_topics]:.2f})"
+                f"      k={num_topics}: cached (test_coh={coherence_test[num_topics]:.4f})"
             )
             models_skipped += 1
             continue
@@ -322,19 +309,12 @@ def main():
         else:
             coherence = coherence_test[num_topics]
 
-        if num_topics not in perplexity_test or args.force:
-            perplexity = calculate_perplexity(model, test_corpus)
-            perplexity_test[num_topics] = perplexity
-        else:
-            perplexity = perplexity_test[num_topics]
-
         elapsed = time.time() - step_start
-        print(f"test_coh={coherence:.4f}, test_perp={perplexity:.2f} ({elapsed:.1f}s)")
+        print(f"test_coh={coherence:.4f} ({elapsed:.1f}s)")
         models_trained += 1
 
     # Save test scores
     save_coherence_scores(coherence_test, "test")
-    save_perplexity_scores(perplexity_test, "test")
     print(f"      Trained: {models_trained}, Skipped: {models_skipped}")
 
     # =========================================================================
@@ -417,23 +397,19 @@ def main():
 
     # Load final scores
     coherence_val = load_coherence_scores("val") or {}
-    perplexity_val = load_perplexity_scores("val") or {}
     coherence_test = load_coherence_scores("test") or {}
-    perplexity_test = load_perplexity_scores("test") or {}
 
     print("\nValidation Scores (5-fold CV averaged):")
-    print("-" * 50)
+    print("-" * 40)
     for k in sorted(coherence_val.keys()):
         coh_val = coherence_val.get(k, 0)
-        perp_val = perplexity_val.get(k, 0)
-        print(f"  k={k:2d}: coherence={coh_val:.4f}  perplexity={perp_val:8.2f}")
+        print(f"  k={k:2d}: coherence={coh_val:.4f}")
 
     print("\nTest Scores (held-out):")
-    print("-" * 50)
+    print("-" * 40)
     for k in sorted(coherence_test.keys()):
         coh_test = coherence_test.get(k, 0)
-        perp_test = perplexity_test.get(k, 0)
-        print(f"  k={k:2d}: coherence={coh_test:.4f}  perplexity={perp_test:8.2f}")
+        print(f"  k={k:2d}: coherence={coh_test:.4f}")
 
     # Find optimal based on test coherence
     if coherence_test:

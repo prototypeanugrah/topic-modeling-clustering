@@ -14,8 +14,6 @@ export interface StatusResponse {
   tokenized_test: boolean;
   coherence_val: boolean;
   coherence_test: boolean;
-  perplexity_val: boolean;
-  perplexity_test: boolean;
   models: Record<number, boolean>;
   distributions_train: Record<number, boolean>;
   distributions_test: Record<number, boolean>;
@@ -27,10 +25,8 @@ export interface CoherenceResponse {
   topic_counts: number[];
   // Validation scores (averaged from 5-fold CV)
   coherence_val: number[];
-  perplexity_val: number[];
   // Test scores (final evaluation on held-out set)
   coherence_test: number[];
-  perplexity_test: number[];
   optimal_topics: number; // Based on test coherence
 }
 

@@ -22,8 +22,6 @@ class StatusResponse(BaseModel):
     tokenized_test: bool
     coherence_val: bool
     coherence_test: bool
-    perplexity_val: bool
-    perplexity_test: bool
     models: dict[int, bool]
     distributions_train: dict[int, bool]
     distributions_test: dict[int, bool]
@@ -37,10 +35,8 @@ class CoherenceResponse(BaseModel):
     topic_counts: list[int]
     # Validation scores (averaged from 5-fold CV)
     coherence_val: list[float]
-    perplexity_val: list[float]
     # Test scores (final evaluation on held-out set)
     coherence_test: list[float]
-    perplexity_test: list[float]
     optimal_topics: int  # Based on test coherence
 
 
