@@ -1,5 +1,5 @@
 import Plot from "react-plotly.js";
-import type { ClusteredVisualizationResponse } from "../../types/api";
+import type { ClusteredVisualizationResponse, DocumentTopicInfo } from "../../types/api";
 
 interface ScatterPlotProps {
   data: ClusteredVisualizationResponse | null;
@@ -96,36 +96,87 @@ export function ScatterPlot({ data, loading, isValidating, dataset, onDatasetCha
     );
   }
 
-  // Group points by cluster
+  // Group points by cluster with enrichment data
   const clusterGroups: Record<
     number,
-    { x: number[]; y: number[]; ids: number[] }
+    {
+      x: number[];
+      y: number[];
+      ids: number[];
+      labels: (string | undefined)[];
+      topTopics: (DocumentTopicInfo[] | undefined)[];
+      topicWords: (string[] | undefined)[];
+    }
   > = {};
 
   data.projections.forEach((point, idx) => {
     const cluster = data.cluster_labels[idx];
     if (!clusterGroups[cluster]) {
-      clusterGroups[cluster] = { x: [], y: [], ids: [] };
+      clusterGroups[cluster] = {
+        x: [],
+        y: [],
+        ids: [],
+        labels: [],
+        topTopics: [],
+        topicWords: [],
+      };
     }
     clusterGroups[cluster].x.push(point[0]);
     clusterGroups[cluster].y.push(point[1]);
     clusterGroups[cluster].ids.push(data.document_ids[idx]);
+
+    // Add enrichment data if available
+    clusterGroups[cluster].labels.push(data.newsgroup_labels?.[idx]);
+    clusterGroups[cluster].topTopics.push(data.top_topics?.[idx]);
+    clusterGroups[cluster].topicWords.push(data.dominant_topic_words?.[idx]);
   });
 
-  const traces = Object.entries(clusterGroups).map(([cluster, points]) => ({
-    x: points.x,
-    y: points.y,
-    type: "scatter" as const,
-    mode: "markers" as const,
-    marker: {
-      color: CLUSTER_COLORS[parseInt(cluster) % CLUSTER_COLORS.length],
-      size: 5,
-      opacity: 0.7,
-    },
-    name: `Cluster ${parseInt(cluster) + 1}`,
-    text: points.ids.map((id) => `Document ${id}`),
-    hoverinfo: "text" as const,
-  }));
+  const traces = Object.entries(clusterGroups).map(([cluster, points]) => {
+    // Build rich hover text with all available information
+    const hoverText = points.ids.map((id, i) => {
+      let text = `<b>Document ${id}</b>`;
+
+      // Original newsgroup label
+      if (points.labels[i]) {
+        text += `<br><b>Category:</b> ${points.labels[i]}`;
+      }
+
+      // Top 3 topics with probabilities
+      if (points.topTopics[i] && points.topTopics[i].length > 0) {
+        const topicsStr = points.topTopics[i]
+          .map((t) => `Topic ${t.topic_id + 1} (${(t.probability * 100).toFixed(1)}%)`)
+          .join(", ");
+        text += `<br><b>Top Topics:</b> ${topicsStr}`;
+      }
+
+      // Top 5 words from dominant topic
+      if (points.topicWords[i] && points.topicWords[i].length > 0) {
+        text += `<br><b>Topic Words:</b> ${points.topicWords[i].join(", ")}`;
+      }
+
+      return text;
+    });
+
+    return {
+      x: points.x,
+      y: points.y,
+      type: "scatter" as const,
+      mode: "markers" as const,
+      marker: {
+        color: CLUSTER_COLORS[parseInt(cluster) % CLUSTER_COLORS.length],
+        size: 5,
+        opacity: 0.7,
+      },
+      name: `Cluster ${parseInt(cluster) + 1}`,
+      text: hoverText,
+      hoverinfo: "text" as const,
+      hoverlabel: {
+        bgcolor: "white",
+        bordercolor: CLUSTER_COLORS[parseInt(cluster) % CLUSTER_COLORS.length],
+        font: { size: 11 },
+      },
+    };
+  });
 
   // Show subtle indicator during background revalidation
   const showValidatingIndicator = isValidating && data;

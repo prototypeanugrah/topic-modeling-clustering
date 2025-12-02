@@ -17,8 +17,8 @@ PYLDAVIS_DIR = CACHE_DIR / "pyldavis"
 MIN_TOPICS = 2
 MAX_TOPICS = 20
 LDA_PASSES = 10
-LDA_ITERATIONS = 50
-LDA_CHUNKSIZE = 2000
+LDA_ITERATIONS = 300
+LDA_CHUNKSIZE = 11000
 LDA_RANDOM_STATE = 42
 
 # Clustering settings
@@ -36,6 +36,15 @@ UMAP_RANDOM_STATE = 42
 # Preprocessing settings
 MIN_TOKEN_LENGTH = 3
 MAX_TOKEN_LENGTH = 50
-MIN_DOC_FREQ = 10
-MAX_DOC_FREQ_RATIO = 0.5
 CUSTOM_STOPWORDS_FILE = BASE_DIR / "custom_stopwords.txt"
+
+# Dictionary filter settings (used by filter_extremes)
+FILTER_NO_BELOW = 5  # Tokens must appear in at least 5 documents
+FILTER_NO_ABOVE = 0.5  # Tokens can appear in max 50% of documents
+
+# Document filtering settings
+MIN_DOC_TOKENS = 8  # Minimum tokens per document after filter_extremes
+
+# Legacy aliases (for backward compatibility with existing code)
+MIN_DOC_FREQ = FILTER_NO_BELOW
+MAX_DOC_FREQ_RATIO = FILTER_NO_ABOVE

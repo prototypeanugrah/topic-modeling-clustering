@@ -17,6 +17,8 @@ dependencies = [
     "tqdm>=4.66.0",
     "umap-learn>=0.5.9.post2",
     "uvicorn[standard]>=0.38.0",
+    "ipykernel>=7.1.0",
+    "ipywidgets>=8.1.8",
 ]
 
 [dependency-groups]

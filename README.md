@@ -59,7 +59,8 @@ topic-modeling-clustering/
 │   ├── hooks/            # Custom React hooks with SWR
 │   └── types/            # TypeScript types
 ├── scripts/
-│   └── precompute.py     # Precomputation pipeline
+│   ├── eda.py            # EDA pipeline (token distribution analysis)
+│   └── precompute.py     # Model training pipeline
 ├── tests/                # pytest unit tests
 ├── cache/                # Cached artifacts (git-ignored)
 ├── custom_stopwords.txt  # User-defined stopwords
@@ -92,14 +93,29 @@ cd frontend && bun install && cd ..
 
 ### 2. Run Precomputation
 
-Trains all LDA models and generates visualizations (~30-90 min).
+**Option A: With EDA (Recommended)**
+
+Analyzes token distributions and filters low-quality documents before training.
 
 ```bash
-# Full precomputation
-uv run scripts/precompute.py
+# Run EDA and save filtered data
+uv run python scripts/eda.py --save-filtered
 
-# Quick test (k=2 to k=4)
-uv run scripts/precompute.py --min-topics 2 --max-topics 4
+# Train models on filtered data
+uv run python scripts/precompute.py --use-filtered
+```
+
+**Option B: Direct**
+
+```bash
+# Train on all documents (no filtering)
+uv run python scripts/precompute.py
+```
+
+Full precomputation takes ~30-90 min. For quick testing:
+
+```bash
+uv run python scripts/precompute.py --min-topics 2 --max-topics 4
 ```
 
 ### 3. Start the Application

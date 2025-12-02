@@ -10,6 +10,8 @@ interface ControlPanelProps {
   optimalClusters?: number;
   minTopics?: number;
   maxTopics?: number;
+  minClusters?: number;
+  maxClusters?: number;
 }
 
 export function ControlPanel({
@@ -21,6 +23,8 @@ export function ControlPanel({
   optimalClusters,
   minTopics = 2,
   maxTopics = 20,
+  minClusters = 2,
+  maxClusters = 15,
 }: ControlPanelProps) {
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 space-y-6">
@@ -42,6 +46,8 @@ export function ControlPanel({
       <ClusterSlider
         value={nClusters}
         onChange={onClustersChange}
+        min={minClusters}
+        max={maxClusters}
         optimalValue={optimalClusters}
       />
     </div>

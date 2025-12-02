@@ -1,7 +1,7 @@
 """Precomputation script for LDA models with cross-validation.
 
 This script implements proper ML evaluation:
-1. Load train/test sets separately
+1. Load train/test sets (or filtered versions from EDA pipeline)
 2. Build vocabulary from full train set (frozen)
 3. Run 5-fold CV on train set for each topic count
 4. Train final model on all train data
@@ -9,6 +9,10 @@ This script implements proper ML evaluation:
 
 Run with: uv run python scripts/precompute.py
 Test with: uv run python scripts/precompute.py --min-topics 2 --max-topics 4
+
+To use filtered data from EDA pipeline:
+    uv run python scripts/eda.py --save-filtered
+    uv run python scripts/precompute.py --use-filtered
 """
 
 import argparse
@@ -16,94 +20,43 @@ import sys
 import time
 from pathlib import Path
 
-import numpy as np
-
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from backend.config import MIN_TOPICS, MAX_TOPICS
-from backend.core.data_loader import load_train_data, load_test_data
-from backend.core.text_preprocessor import preprocess_documents
-from backend.core.lda_trainer import (
-    create_dictionary,
-    create_corpus,
-    train_lda,
-    get_doc_topic_distribution,
-    calculate_coherence,
-    calculate_perplexity,
-    run_cross_validation,
-)
-from backend.core.projections import compute_umap
 from backend.cache.manager import (
     ensure_cache_dirs,
-    save_dictionary,
-    save_corpus,
-    save_tokenized_docs,
-    save_lda_model,
-    save_doc_topic_distribution,
-    save_umap_projection,
+    get_pyldavis_path,
+    load_coherence_scores,
+    load_corpus,
+    load_dictionary,
+    load_doc_topic_distribution,
+    load_lda_model,
+    load_perplexity_scores,
+    load_tokenized_docs,
+    load_umap_projection,
     save_coherence_scores,
+    save_corpus,
+    save_dictionary,
+    save_doc_topic_distribution,
+    save_lda_model,
     save_perplexity_scores,
     save_pyldavis_html,
-    save_eda_stats,
-    load_coherence_scores,
-    load_perplexity_scores,
-    load_dictionary,
-    load_corpus,
-    load_tokenized_docs,
-    load_lda_model,
-    load_doc_topic_distribution,
-    load_umap_projection,
-    get_pyldavis_path,
-    load_eda_stats,
+    save_tokenized_docs,
+    save_umap_projection,
 )
-
-
-def compute_stage_stats(lengths: list[int], n_bins: int = 50) -> dict:
-    """Compute statistics for one preprocessing stage.
-
-    Args:
-        lengths: List of document lengths (chars or tokens)
-        n_bins: Number of histogram bins
-
-    Returns:
-        Dictionary with statistics and histogram data
-    """
-    lengths_arr = np.array(lengths)
-    n_docs = len(lengths_arr)
-    empty_count = int(np.sum(lengths_arr == 0))
-
-    # Compute basic stats
-    stats = {
-        "n_documents": n_docs,
-        "avg_length": float(np.mean(lengths_arr)),
-        "median_length": float(np.median(lengths_arr)),
-        "min_length": int(np.min(lengths_arr)),
-        "max_length": int(np.max(lengths_arr)),
-        "std_length": float(np.std(lengths_arr)),
-        "empty_count": empty_count,
-        "empty_pct": float(100 * empty_count / n_docs) if n_docs > 0 else 0.0,
-    }
-
-    # Compute percentiles
-    percentile_values = [10, 25, 50, 75, 90, 95, 99]
-    stats["percentiles"] = {
-        p: float(np.percentile(lengths_arr, p)) for p in percentile_values
-    }
-
-    # Compute histogram (exclude zeros for better visualization, cap at 99th percentile)
-    non_zero = lengths_arr[lengths_arr > 0]
-    if len(non_zero) > 0:
-        max_val = np.percentile(non_zero, 99)  # Cap at 99th percentile
-        clipped = np.clip(non_zero, 0, max_val)
-        counts, bin_edges = np.histogram(clipped, bins=n_bins)
-        stats["histogram_bins"] = [float(b) for b in bin_edges]
-        stats["histogram_counts"] = [int(c) for c in counts]
-    else:
-        stats["histogram_bins"] = [0.0, 1.0]
-        stats["histogram_counts"] = [0]
-
-    return stats
+from backend.config import MAX_TOPICS, MIN_TOPICS
+from backend.core.data_loader import load_test_data, load_train_data
+from backend.core.lda_trainer import (
+    calculate_coherence,
+    calculate_perplexity,
+    create_corpus,
+    create_dictionary,
+    get_doc_topic_distribution,
+    run_cross_validation,
+    train_lda,
+)
+from backend.core.projections import compute_umap
+from backend.core.text_preprocessor import preprocess_documents
 
 
 def parse_args():
@@ -115,29 +68,34 @@ def parse_args():
         "--min-topics",
         type=int,
         default=MIN_TOPICS,
-        help=f"Minimum number of topics (default: {MIN_TOPICS})"
+        help=f"Minimum number of topics (default: {MIN_TOPICS})",
     )
     parser.add_argument(
         "--max-topics",
         type=int,
         default=MAX_TOPICS,
-        help=f"Maximum number of topics (default: {MAX_TOPICS})"
+        help=f"Maximum number of topics (default: {MAX_TOPICS})",
     )
     parser.add_argument(
         "--n-folds",
         type=int,
         default=5,
-        help="Number of cross-validation folds (default: 5)"
+        help="Number of cross-validation folds (default: 5)",
     )
     parser.add_argument(
         "--skip-cv",
         action="store_true",
-        help="Skip cross-validation (only train final models)"
+        help="Skip cross-validation (only train final models)",
+    )
+    parser.add_argument(
+        "--use-filtered",
+        action="store_true",
+        help="Use filtered data from EDA pipeline (run eda.py --save-filtered first)",
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Force regeneration even if cache exists"
+        help="Force regeneration even if cache exists",
     )
     return parser.parse_args()
 
@@ -149,76 +107,55 @@ def main():
     min_topics = args.min_topics
     max_topics = args.max_topics
     n_folds = args.n_folds
+    use_filtered = args.use_filtered
+
+    # Auto-force regeneration when using filtered data to avoid stale cache
+    if use_filtered and not args.force:
+        args.force = True
 
     print("=" * 70)
     print("Topic Modeling Precomputation Pipeline (with Cross-Validation)")
     print(f"Topics range: {min_topics} to {max_topics}")
     print(f"CV folds: {n_folds}")
+    if use_filtered:
+        print("Using filtered data from EDA pipeline (forcing regeneration)")
     print("=" * 70)
 
     start_time = time.time()
     ensure_cache_dirs()
 
-    # ==========================================================================
+    # =========================================================================
     # STEP 1: Load and preprocess train/test data
-    # ==========================================================================
+    # =========================================================================
+
+    # Determine which dataset to use
+    if use_filtered:
+        train_dataset = "train_filtered"
+        test_dataset = "test_filtered"
+    else:
+        train_dataset = "train"
+        test_dataset = "test"
 
     # Check if preprocessed data exists
     dictionary = load_dictionary()
-    train_corpus = load_corpus("train")
-    test_corpus = load_corpus("test")
-    train_tokenized = load_tokenized_docs("train")
-    test_tokenized = load_tokenized_docs("test")
-
-    # Check for cached EDA stats
-    eda_stats = load_eda_stats()
+    train_corpus = load_corpus(train_dataset)
+    test_corpus = load_corpus(test_dataset)
+    train_tokenized = load_tokenized_docs(train_dataset)
+    test_tokenized = load_tokenized_docs(test_dataset)
 
     if all([dictionary, train_corpus, test_corpus, train_tokenized, test_tokenized]):
-        print("\n[1/8] Using cached preprocessed data...")
+        print(f"\n[1/7] Using cached preprocessed data ({train_dataset})...")
         print(f"      Dictionary size: {len(dictionary)} terms")
         print(f"      Train corpus: {len(train_corpus)} documents")
         print(f"      Test corpus: {len(test_corpus)} documents")
-
-        # Compute EDA if not cached
-        if eda_stats is None or args.force:
-            print("\n[EDA] Computing dataset statistics...")
-            # Need to reload raw data for raw lengths
-            train_data = load_train_data()
-            test_data = load_test_data()
-
-            # Raw lengths (characters)
-            raw_train_lengths = [len(doc) for doc in train_data.documents]
-            raw_test_lengths = [len(doc) for doc in test_data.documents]
-
-            # Tokenized lengths
-            tokenized_train_lengths = [len(doc) for doc in train_tokenized]
-            tokenized_test_lengths = [len(doc) for doc in test_tokenized]
-
-            # Filtered lengths (corpus token counts)
-            filtered_train_lengths = [sum(count for _, count in doc) for doc in train_corpus]
-            filtered_test_lengths = [sum(count for _, count in doc) for doc in test_corpus]
-
-            # Vocab size before filter_extremes
-            vocab_before = len(set(w for doc in train_tokenized for w in doc))
-
-            # Compute all stats
-            eda_stats = {
-                "raw_train": compute_stage_stats(raw_train_lengths),
-                "raw_test": compute_stage_stats(raw_test_lengths),
-                "vocab_before_filter": vocab_before,
-                "tokenized_train": compute_stage_stats(tokenized_train_lengths),
-                "tokenized_test": compute_stage_stats(tokenized_test_lengths),
-                "vocab_after_filter": len(dictionary),
-                "filtered_train": compute_stage_stats(filtered_train_lengths),
-                "filtered_test": compute_stage_stats(filtered_test_lengths),
-                "vocab_reduction_pct": float(100 * (1 - len(dictionary) / vocab_before)) if vocab_before > 0 else 0.0,
-                "token_reduction_pct": float(100 * (1 - sum(filtered_train_lengths) / sum(tokenized_train_lengths))) if sum(tokenized_train_lengths) > 0 else 0.0,
-            }
-            save_eda_stats(eda_stats)
-            print(f"      EDA stats saved")
     else:
+        if use_filtered:
+            print("\n[ERROR] Filtered data not found!")
+            print("        Run 'uv run python scripts/eda.py --save-filtered' first.")
+            sys.exit(1)
+
         # Load train data
-        print("\n[1/8] Loading train/test datasets...")
+        print("\n[1/7] Loading train/test datasets...")
         step_start = time.time()
 
         train_data = load_train_data()
@@ -228,31 +165,30 @@ def main():
         print(f"      Test: {len(test_data.documents)} documents")
         print(f"      Loaded in {time.time() - step_start:.1f}s")
 
-        # Compute raw document lengths for EDA
-        raw_train_lengths = [len(doc) for doc in train_data.documents]
-        raw_test_lengths = [len(doc) for doc in test_data.documents]
-
         # Preprocess train data
-        print("\n[2/8] Preprocessing train documents...")
+        print("\n[2/7] Preprocessing train documents...")
         step_start = time.time()
-        train_tokenized = list(preprocess_documents(train_data.documents, show_progress=True))
+        train_tokenized = list(
+            preprocess_documents(train_data.documents, show_progress=True)
+        )
         save_tokenized_docs(train_tokenized, "train")
-        print(f"      Preprocessed {len(train_tokenized)} train docs in {time.time() - step_start:.1f}s")
+        print(
+            f"      Preprocessed {len(train_tokenized)} train docs in {time.time() - step_start:.1f}s"
+        )
 
         # Preprocess test data
-        print("\n[3/8] Preprocessing test documents...")
+        print("\n[3/7] Preprocessing test documents...")
         step_start = time.time()
-        test_tokenized = list(preprocess_documents(test_data.documents, show_progress=True))
+        test_tokenized = list(
+            preprocess_documents(test_data.documents, show_progress=True)
+        )
         save_tokenized_docs(test_tokenized, "test")
-        print(f"      Preprocessed {len(test_tokenized)} test docs in {time.time() - step_start:.1f}s")
-
-        # Compute tokenized lengths for EDA
-        tokenized_train_lengths = [len(doc) for doc in train_tokenized]
-        tokenized_test_lengths = [len(doc) for doc in test_tokenized]
-        vocab_before = len(set(w for doc in train_tokenized for w in doc))
+        print(
+            f"      Preprocessed {len(test_tokenized)} test docs in {time.time() - step_start:.1f}s"
+        )
 
         # Create dictionary from TRAIN SET ONLY (frozen vocabulary)
-        print("\n[4/8] Creating vocabulary from train set (frozen)...")
+        print("\n[4/7] Creating vocabulary from train set (frozen)...")
         step_start = time.time()
         dictionary = create_dictionary(train_tokenized)
         save_dictionary(dictionary)
@@ -267,33 +203,14 @@ def main():
         print(f"      Test corpus: {len(test_corpus)} docs")
         print(f"      Created in {time.time() - step_start:.1f}s")
 
-        # Compute filtered lengths for EDA
-        filtered_train_lengths = [sum(count for _, count in doc) for doc in train_corpus]
-        filtered_test_lengths = [sum(count for _, count in doc) for doc in test_corpus]
-
-        # Save EDA stats
-        print("\n[EDA] Computing and saving dataset statistics...")
-        eda_stats = {
-            "raw_train": compute_stage_stats(raw_train_lengths),
-            "raw_test": compute_stage_stats(raw_test_lengths),
-            "vocab_before_filter": vocab_before,
-            "tokenized_train": compute_stage_stats(tokenized_train_lengths),
-            "tokenized_test": compute_stage_stats(tokenized_test_lengths),
-            "vocab_after_filter": len(dictionary),
-            "filtered_train": compute_stage_stats(filtered_train_lengths),
-            "filtered_test": compute_stage_stats(filtered_test_lengths),
-            "vocab_reduction_pct": float(100 * (1 - len(dictionary) / vocab_before)) if vocab_before > 0 else 0.0,
-            "token_reduction_pct": float(100 * (1 - sum(filtered_train_lengths) / sum(tokenized_train_lengths))) if sum(tokenized_train_lengths) > 0 else 0.0,
-        }
-        save_eda_stats(eda_stats)
-        print(f"      EDA stats saved")
-
-    # ==========================================================================
+    # =========================================================================
     # STEP 2: Run Cross-Validation (if not skipped)
-    # ==========================================================================
+    # =========================================================================
 
     if not args.skip_cv:
-        print(f"\n[5/8] Running {n_folds}-fold Cross-Validation (k={min_topics} to {max_topics})...")
+        print(
+            f"\n[5/7] Running {n_folds}-fold Cross-Validation (k={min_topics} to {max_topics})..."
+        )
 
         # Load existing val scores if any
         coherence_val = load_coherence_scores("val") or {}
@@ -301,12 +218,22 @@ def main():
 
         for num_topics in range(min_topics, max_topics + 1):
             # Skip if already computed
-            if num_topics in coherence_val and num_topics in perplexity_val and not args.force:
-                print(f"      k={num_topics}: cached (val_coh={coherence_val[num_topics]:.4f}, val_perp={perplexity_val[num_topics]:.2f})")
+            if (
+                num_topics in coherence_val
+                and num_topics in perplexity_val
+                and not args.force
+            ):
+                print(
+                    f"      k={num_topics}: cached (val_coh={coherence_val[num_topics]:.4f}, val_perp={perplexity_val[num_topics]:.2f})"
+                )
                 continue
 
             step_start = time.time()
-            print(f"      k={num_topics}: running {n_folds}-fold CV...", end=" ", flush=True)
+            print(
+                f"      k={num_topics}: running {n_folds}-fold CV...",
+                end=" ",
+                flush=True,
+            )
 
             # Run cross-validation
             cv_result = run_cross_validation(
@@ -321,20 +248,24 @@ def main():
             perplexity_val[num_topics] = cv_result.avg_perplexity
 
             elapsed = time.time() - step_start
-            print(f"val_coh={cv_result.avg_coherence:.4f}±{cv_result.std_coherence:.4f}, "
-                  f"val_perp={cv_result.avg_perplexity:.2f}±{cv_result.std_perplexity:.2f} ({elapsed:.1f}s)")
+            print(
+                f"val_coh={cv_result.avg_coherence:.4f}±{cv_result.std_coherence:.4f}, "
+                f"val_perp={cv_result.avg_perplexity:.2f}±{cv_result.std_perplexity:.2f} ({elapsed:.1f}s)"
+            )
 
         # Save validation scores
         save_coherence_scores(coherence_val, "val")
         save_perplexity_scores(perplexity_val, "val")
     else:
-        print("\n[5/8] Skipping Cross-Validation...")
+        print("\n[5/7] Skipping Cross-Validation...")
 
-    # ==========================================================================
+    # =========================================================================
     # STEP 3: Train Final Models on Full Train Set
-    # ==========================================================================
+    # =========================================================================
 
-    print(f"\n[6/8] Training final models on full train set (k={min_topics} to {max_topics})...")
+    print(
+        f"\n[6/7] Training final models on full train set (k={min_topics} to {max_topics})..."
+    )
 
     # Load existing test scores if any
     coherence_test = load_coherence_scores("test") or {}
@@ -349,15 +280,17 @@ def main():
         existing_test_dist = load_doc_topic_distribution(num_topics, "test")
 
         all_exist = (
-            existing_model is not None and
-            existing_train_dist is not None and
-            existing_test_dist is not None and
-            num_topics in coherence_test and
-            num_topics in perplexity_test
+            existing_model is not None
+            and existing_train_dist is not None
+            and existing_test_dist is not None
+            and num_topics in coherence_test
+            and num_topics in perplexity_test
         )
 
         if all_exist and not args.force:
-            print(f"      k={num_topics}: cached (test_coh={coherence_test[num_topics]:.4f}, test_perp={perplexity_test[num_topics]:.2f})")
+            print(
+                f"      k={num_topics}: cached (test_coh={coherence_test[num_topics]:.4f}, test_perp={perplexity_test[num_topics]:.2f})"
+            )
             models_skipped += 1
             continue
 
@@ -382,8 +315,9 @@ def main():
             save_doc_topic_distribution(test_dist, num_topics, "test")
 
         # Calculate test metrics
+        # Coherence uses train set for sufficient word co-occurrence stats
         if num_topics not in coherence_test or args.force:
-            coherence = calculate_coherence(model, test_tokenized, dictionary)
+            coherence = calculate_coherence(model, train_tokenized, dictionary)
             coherence_test[num_topics] = coherence
         else:
             coherence = coherence_test[num_topics]
@@ -403,11 +337,11 @@ def main():
     save_perplexity_scores(perplexity_test, "test")
     print(f"      Trained: {models_trained}, Skipped: {models_skipped}")
 
-    # ==========================================================================
+    # =========================================================================
     # STEP 4: Compute UMAP Projections for Train and Test
-    # ==========================================================================
+    # =========================================================================
 
-    print("\n[7/8] Computing UMAP projections...")
+    print("\n[7/7] Computing UMAP projections and pyLDAvis...")
     umap_computed = 0
     umap_skipped = 0
 
@@ -432,13 +366,12 @@ def main():
             print(f"({elapsed:.1f}s)")
             umap_computed += 1
 
-    print(f"      Computed: {umap_computed}, Skipped: {umap_skipped}")
+    print(f"      UMAP - Computed: {umap_computed}, Skipped: {umap_skipped}")
 
-    # ==========================================================================
+    # =========================================================================
     # STEP 5: Generate pyLDAvis Visualizations
-    # ==========================================================================
+    # =========================================================================
 
-    print("\n[8/8] Generating pyLDAvis visualizations...")
     try:
         import pyLDAvis
         import pyLDAvis.gensim_models
@@ -456,7 +389,9 @@ def main():
             print(f"      pyLDAvis for k={num_topics}...", end=" ", flush=True)
 
             model = load_lda_model(num_topics)
-            vis_data = pyLDAvis.gensim_models.prepare(model, train_corpus, dictionary, sort_topics=False)
+            vis_data = pyLDAvis.gensim_models.prepare(
+                model, train_corpus, dictionary, sort_topics=False
+            )
             html = pyLDAvis.prepared_data_to_html(vis_data)
             save_pyldavis_html(html, num_topics)
 
@@ -464,16 +399,16 @@ def main():
             print(f"({elapsed:.1f}s)")
             pyldavis_generated += 1
 
-        print(f"      Generated: {pyldavis_generated}, Skipped: {pyldavis_skipped}")
+        print(f"      pyLDAvis - Generated: {pyldavis_generated}, Skipped: {pyldavis_skipped}")
 
     except ImportError:
         print("      pyLDAvis not installed, skipping visualization generation")
     except Exception as e:
         print(f"      Error generating pyLDAvis: {e}")
 
-    # ==========================================================================
+    # =========================================================================
     # Summary
-    # ==========================================================================
+    # =========================================================================
 
     total_time = time.time() - start_time
     print("\n" + "=" * 70)

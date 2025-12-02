@@ -341,6 +341,36 @@ def load_eda_stats() -> dict | None:
     return None
 
 
+def save_document_labels(labels: list[str], dataset: str = "train") -> Path:
+    """Save newsgroup labels for filtered documents.
+
+    Args:
+        labels: List of newsgroup label strings (e.g., ["alt.atheism", "sci.space", ...])
+        dataset: 'train' or 'test'
+    """
+    ensure_cache_dirs()
+    path = MODELS_DIR / f"labels_{dataset}.json"
+    with open(path, "w") as f:
+        json.dump(labels, f)
+    return path
+
+
+def load_document_labels(dataset: str = "train") -> list[str] | None:
+    """Load newsgroup labels for filtered documents.
+
+    Args:
+        dataset: 'train' or 'test'
+
+    Returns:
+        List of newsgroup label strings, or None if not cached
+    """
+    path = MODELS_DIR / f"labels_{dataset}.json"
+    if path.exists():
+        with open(path, "r") as f:
+            return json.load(f)
+    return None
+
+
 def clear_cache() -> None:
     """Clear all cached artifacts."""
     import shutil

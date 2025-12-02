@@ -8,12 +8,12 @@ from gensim.models import LdaModel
 from gensim.models.coherencemodel import CoherenceModel
 
 from backend.config import (
+    FILTER_NO_ABOVE,
+    FILTER_NO_BELOW,
     LDA_CHUNKSIZE,
     LDA_ITERATIONS,
     LDA_PASSES,
     LDA_RANDOM_STATE,
-    MAX_DOC_FREQ_RATIO,
-    MIN_DOC_FREQ,
 )
 
 
@@ -39,8 +39,9 @@ def create_dictionary(tokenized_docs: list[list[str]]) -> corpora.Dictionary:
     """
     dictionary = corpora.Dictionary(tokenized_docs)
 
-    # Filter extremes
-    dictionary.filter_extremes(no_below=MIN_DOC_FREQ, no_above=MAX_DOC_FREQ_RATIO)
+    # Filter extremes: remove tokens appearing in fewer than FILTER_NO_BELOW docs
+    # or more than FILTER_NO_ABOVE fraction of docs
+    dictionary.filter_extremes(no_below=FILTER_NO_BELOW, no_above=FILTER_NO_ABOVE)
 
     return dictionary
 

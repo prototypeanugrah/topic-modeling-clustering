@@ -88,6 +88,13 @@ class VisualizationResponse(BaseModel):
     dataset: str = "train"  # "train" or "test"
 
 
+class DocumentTopicInfo(BaseModel):
+    """Top topic information for a single document."""
+
+    topic_id: int
+    probability: float
+
+
 class ClusteredVisualizationResponse(BaseModel):
     """Response for clustered visualization endpoint."""
 
@@ -97,6 +104,11 @@ class ClusteredVisualizationResponse(BaseModel):
     cluster_labels: list[int]
     document_ids: list[int]
     dataset: str = "train"  # "train" or "test"
+
+    # Optional enrichment fields for tooltip
+    newsgroup_labels: Optional[list[str]] = None  # Original 20 newsgroups labels
+    top_topics: Optional[list[list[DocumentTopicInfo]]] = None  # Top 3 topics per doc
+    dominant_topic_words: Optional[list[list[str]]] = None  # Top 5 words from dominant topic
 
 
 class PrecomputeProgressResponse(BaseModel):
@@ -121,36 +133,44 @@ class StageStats(BaseModel):
     """Statistics for one preprocessing stage."""
 
     n_documents: int
-    avg_length: float
-    median_length: float
-    min_length: int
-    max_length: int
-    std_length: float
+    mean: float
+    median: float
+    min: int
+    max: int
+    std: float
     empty_count: int
     empty_pct: float
-    percentiles: dict[int, float]  # {10, 25, 50, 75, 90, 95, 99}
+    percentiles: dict[str, float]  # {"10", "25", "50", "75", "90", "95", "99"}
     # For histogram (binned data to reduce payload)
     histogram_bins: list[float]  # bin edges
     histogram_counts: list[int]  # counts per bin
 
 
 class EDAResponse(BaseModel):
-    """Full EDA response with 3 preprocessing stages."""
+    """Full EDA response with 4 preprocessing stages."""
 
-    # Stage 1: Raw documents (character lengths)
+    # Stage 1: Raw documents (token counts via whitespace split)
     raw_train: StageStats
     raw_test: StageStats
 
-    # Stage 2: Tokenized (before filter_extremes)
+    # Stage 2: Tokenized (after preprocessing, before filter_extremes)
     vocab_before_filter: int
     tokenized_train: StageStats
     tokenized_test: StageStats
 
-    # Stage 3: Filtered (corpus for LDA)
+    # Stage 3: After filter_extremes
     vocab_after_filter: int
     filtered_train: StageStats
     filtered_test: StageStats
-
-    # Summary metrics
     vocab_reduction_pct: float
-    token_reduction_pct: float
+
+    # Stage 4: After document filtering (final corpus)
+    final_train: StageStats
+    final_test: StageStats
+    min_tokens_threshold: int
+    train_docs_removed: int
+    test_docs_removed: int
+
+    # Filter settings used
+    filter_no_below: int
+    filter_no_above: float
