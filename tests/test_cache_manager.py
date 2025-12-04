@@ -58,11 +58,11 @@ class TestDocTopicDistribution:
         import importlib
         importlib.reload(manager)
 
-        # Save for train dataset
-        manager.save_doc_topic_distribution(sample_doc_topic_matrix, num_topics=3, dataset="train")
+        # Save distribution
+        manager.save_doc_topic_distribution(sample_doc_topic_matrix, num_topics=3)
 
         # Load
-        loaded = manager.load_doc_topic_distribution(3, dataset="train")
+        loaded = manager.load_doc_topic_distribution(3)
 
         assert loaded is not None
         np.testing.assert_array_almost_equal(loaded, sample_doc_topic_matrix)
@@ -76,7 +76,7 @@ class TestDocTopicDistribution:
         import importlib
         importlib.reload(manager)
 
-        result = manager.load_doc_topic_distribution(999, dataset="train")
+        result = manager.load_doc_topic_distribution(999)
         assert result is None
 
 
@@ -92,11 +92,11 @@ class TestUmapProjection:
         import importlib
         importlib.reload(manager)
 
-        # Save for train dataset
-        manager.save_umap_projection(sample_projections, num_topics=5, dataset="train")
+        # Save projections
+        manager.save_umap_projection(sample_projections, num_topics=5)
 
         # Load
-        loaded = manager.load_umap_projection(5, dataset="train")
+        loaded = manager.load_umap_projection(5)
 
         assert loaded is not None
         np.testing.assert_array_almost_equal(loaded, sample_projections)
@@ -116,11 +116,11 @@ class TestCoherenceScores:
 
         scores = {2: 0.35, 3: 0.42, 4: 0.38, 5: 0.40}
 
-        # Save for test split
-        manager.save_coherence_scores(scores, split="test")
+        # Save coherence scores
+        manager.save_coherence_scores(scores)
 
         # Load
-        loaded = manager.load_coherence_scores(split="test")
+        loaded = manager.load_coherence_scores()
 
         assert loaded is not None
         assert loaded == scores
@@ -135,8 +135,8 @@ class TestCoherenceScores:
         importlib.reload(manager)
 
         scores = {2: 0.35, 10: 0.42}
-        manager.save_coherence_scores(scores, split="val")
-        loaded = manager.load_coherence_scores(split="val")
+        manager.save_coherence_scores(scores)
+        loaded = manager.load_coherence_scores()
 
         # Keys should still be integers
         assert all(isinstance(k, int) for k in loaded.keys())
@@ -178,7 +178,5 @@ class TestCacheStatus:
         assert isinstance(status, dict)
         assert "complete" in status
         assert "models" in status
-        assert "distributions_train" in status
-        assert "distributions_test" in status
-        assert "projections_train" in status
-        assert "projections_test" in status
+        assert "distributions" in status
+        assert "projections" in status

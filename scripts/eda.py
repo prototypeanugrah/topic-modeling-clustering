@@ -33,6 +33,7 @@ from backend.cache.manager import (
     load_corpus,
     load_dictionary,
     load_tokenized_docs,
+    save_box_plot_data,
     save_corpus,
     save_dictionary,
     save_document_labels,
@@ -46,7 +47,7 @@ from backend.config import (
     MIN_DOC_TOKENS,
     MODELS_DIR,
 )
-from backend.core.data_loader import load_test_data, load_train_data
+from backend.core.data_loader import load_all_data
 from backend.core.lda_trainer import create_corpus
 from backend.core.text_preprocessor import preprocess_documents
 from gensim import corpora
@@ -156,12 +157,13 @@ def compute_stage_stats(lengths: list[int], n_bins: int = 50) -> dict:
         str(p): float(np.percentile(lengths_arr, p)) for p in percentile_values
     }
 
-    # Compute histogram (exclude zeros for better visualization, cap at 99th percentile)
+    # Compute histogram (exclude zeros for better visualization, cap at 95th percentile)
     non_zero = lengths_arr[lengths_arr > 0]
     if len(non_zero) > 0:
-        max_val = np.percentile(non_zero, 99)  # Cap at 99th percentile
-        clipped = np.clip(non_zero, 0, max_val)
-        counts, bin_edges = np.histogram(clipped, bins=n_bins)
+        max_val = np.percentile(non_zero, 95)  # Cap at 95th percentile
+        capped = np.minimum(non_zero, max_val)  # Cap values above 95th percentile
+        min_val = capped.min()
+        counts, bin_edges = np.histogram(capped, bins=n_bins, range=(min_val, max_val))
         stats["histogram_bins"] = [float(b) for b in bin_edges]
         stats["histogram_counts"] = [int(c) for c in counts]
     else:
@@ -323,40 +325,23 @@ def main():
     ensure_cache_dirs()
 
     # =========================================================================
-    # Load or preprocess data
+    # Load and preprocess data
     # =========================================================================
 
-    # Check for cached preprocessed data
-    train_tokenized = load_tokenized_docs("train")
-    test_tokenized = load_tokenized_docs("test")
+    # Always load raw data and preprocess for EDA
+    # (Don't use cached tokenized docs - they might be filtered from a previous run)
+    print("\n[1/4] Loading and preprocessing data...")
+    step_start = time.time()
 
-    if train_tokenized and test_tokenized and not args.force:
-        print("\n[1/4] Using cached preprocessed data...")
-        train_data = load_train_data()
-        test_data = load_test_data()
-    else:
-        print("\n[1/4] Loading and preprocessing data...")
-        step_start = time.time()
+    data = load_all_data()
+    print(f"      Total: {len(data.documents)} documents")
 
-        train_data = load_train_data()
-        test_data = load_test_data()
+    print("      Preprocessing documents...")
+    tokenized = list(
+        preprocess_documents(data.documents, show_progress=True)
+    )
 
-        print(f"      Train: {len(train_data.documents)} documents")
-        print(f"      Test: {len(test_data.documents)} documents")
-
-        print("      Preprocessing train documents...")
-        train_tokenized = list(
-            preprocess_documents(train_data.documents, show_progress=True)
-        )
-        save_tokenized_docs(train_tokenized, "train")
-
-        print("      Preprocessing test documents...")
-        test_tokenized = list(
-            preprocess_documents(test_data.documents, show_progress=True)
-        )
-        save_tokenized_docs(test_tokenized, "test")
-
-        print(f"      Done in {time.time() - step_start:.1f}s")
+    print(f"      Done in {time.time() - step_start:.1f}s")
 
     # =========================================================================
     # Stage 1: Raw Documents (whitespace-split tokens)
@@ -366,28 +351,22 @@ def main():
     print("Stage 1: Raw Documents (whitespace-split tokens)")
     print("=" * 80)
 
-    raw_train_counts = get_raw_token_counts(train_data.documents)
-    raw_test_counts = get_raw_token_counts(test_data.documents)
+    raw_counts = get_raw_token_counts(data.documents)
+    raw_stats = compute_stage_stats(raw_counts)
 
-    raw_train_stats = compute_stage_stats(raw_train_counts)
-    raw_test_stats = compute_stage_stats(raw_test_counts)
-
-    print_stage_stats("Train Set", raw_train_stats)
-    print_stage_stats("Test Set", raw_test_stats)
+    print_stage_stats("All Documents", raw_stats)
 
     # Save Stage 1 artifacts
-    save_token_counts(raw_train_counts, "train_raw", stage=1)
-    save_token_counts(raw_test_counts, "test_raw", stage=1)
-    save_artifact("train_stats", raw_train_stats, stage=1)
-    save_artifact("test_stats", raw_test_stats, stage=1)
+    save_token_counts(raw_counts, "raw", stage=1)
+    save_artifact("stats", raw_stats, stage=1)
     print(f"\n  Artifacts saved to {EDA_DIR}/stage1/")
 
     if args.verbose:
         print("\n  Sample document (raw):")
         sample_idx = 0
-        sample_doc = train_data.documents[sample_idx][:500]
+        sample_doc = data.documents[sample_idx][:500]
         print(f"  '{sample_doc}...'")
-        print(f"  Whitespace tokens: {raw_train_counts[sample_idx]}")
+        print(f"  Whitespace tokens: {raw_counts[sample_idx]}")
 
     # =========================================================================
     # Stage 2: After Preprocessing (tokenization + lemmatization + stopwords)
@@ -397,34 +376,28 @@ def main():
     print("Stage 2: After Preprocessing (tokenize + lemmatize + stopwords)")
     print("=" * 80)
 
-    tokenized_train_counts = [len(doc) for doc in train_tokenized]
-    tokenized_test_counts = [len(doc) for doc in test_tokenized]
-
-    tokenized_train_stats = compute_stage_stats(tokenized_train_counts)
-    tokenized_test_stats = compute_stage_stats(tokenized_test_counts)
+    tokenized_counts = [len(doc) for doc in tokenized]
+    tokenized_stats = compute_stage_stats(tokenized_counts)
 
     # Compute vocabulary size before filter
-    all_tokens_train = [w for doc in train_tokenized for w in doc]
-    vocab_before = len(set(all_tokens_train))
+    all_tokens = [w for doc in tokenized for w in doc]
+    vocab_before = len(set(all_tokens))
 
     # Compute token frequency distribution
     from collections import Counter
-    token_freq = Counter(all_tokens_train)
+    token_freq = Counter(all_tokens)
     top_tokens = token_freq.most_common(100)
 
-    print_stage_stats("Train Set", tokenized_train_stats)
-    print_stage_stats("Test Set", tokenized_test_stats)
-    print(f"\n  Vocabulary size (train): {vocab_before:,} unique tokens")
-    print(f"  Total tokens (train): {len(all_tokens_train):,}")
+    print_stage_stats("All Documents", tokenized_stats)
+    print(f"\n  Vocabulary size: {vocab_before:,} unique tokens")
+    print(f"  Total tokens: {len(all_tokens):,}")
 
     # Save Stage 2 artifacts
-    save_token_counts(tokenized_train_counts, "train_tokenized", stage=2)
-    save_token_counts(tokenized_test_counts, "test_tokenized", stage=2)
-    save_artifact("train_stats", tokenized_train_stats, stage=2)
-    save_artifact("test_stats", tokenized_test_stats, stage=2)
+    save_token_counts(tokenized_counts, "tokenized", stage=2)
+    save_artifact("stats", tokenized_stats, stage=2)
     save_artifact("vocabulary_info", {
         "vocab_size": vocab_before,
-        "total_tokens": len(all_tokens_train),
+        "total_tokens": len(all_tokens),
         "top_100_tokens": top_tokens,
     }, stage=2)
     save_artifact("token_frequencies", dict(token_freq), stage=2)
@@ -432,9 +405,9 @@ def main():
 
     if args.verbose:
         print("\n  Sample document (preprocessed):")
-        sample_tokens = train_tokenized[0][:20]
+        sample_tokens = tokenized[0][:20]
         print(f"  {sample_tokens}")
-        print(f"  Token count: {tokenized_train_counts[0]}")
+        print(f"  Token count: {tokenized_counts[0]}")
         print("\n  Top 10 tokens:")
         for token, count in top_tokens[:10]:
             print(f"    {token}: {count:,}")
@@ -451,7 +424,7 @@ def main():
 
     # Create dictionary WITHOUT filter_extremes first (for debugging)
     print("  Creating dictionary before filter_extremes...")
-    dictionary_unfiltered = corpora.Dictionary(train_tokenized)
+    dictionary_unfiltered = corpora.Dictionary(tokenized)
     vocab_unfiltered = len(dictionary_unfiltered)
 
     # Save unfiltered dictionary
@@ -462,7 +435,7 @@ def main():
 
     # Create dictionary WITH filter_extremes
     print("  Applying filter_extremes...")
-    dictionary = corpora.Dictionary(train_tokenized)
+    dictionary = corpora.Dictionary(tokenized)
 
     # Track which tokens will be removed
     tokens_before = set(dictionary.token2id.keys())
@@ -481,7 +454,7 @@ def main():
             removed_token_info.append({
                 "token": token,
                 "doc_freq": doc_freq,
-                "doc_freq_pct": 100 * doc_freq / len(train_tokenized),
+                "doc_freq_pct": 100 * doc_freq / len(tokenized),
             })
 
     # Sort by doc_freq to see what was removed
@@ -496,41 +469,29 @@ def main():
     print(f"\n  Vocabulary: {vocab_before:,} -> {vocab_after:,} ({vocab_reduction:.1f}% reduction)")
     print(f"  Tokens removed: {len(tokens_removed):,}")
 
-    # Create corpora
-    train_corpus = create_corpus(train_tokenized, dictionary)
-    test_corpus = create_corpus(test_tokenized, dictionary)
+    # Create corpus
+    corpus = create_corpus(tokenized, dictionary)
 
-    # Save corpora
-    save_corpus(train_corpus, "train")
-    save_corpus(test_corpus, "test")
+    # Save corpus
+    save_corpus(corpus)
 
     # Get token counts after filter
-    filtered_train_counts = get_corpus_token_counts(train_corpus)
-    filtered_test_counts = get_corpus_token_counts(test_corpus)
+    filtered_counts = get_corpus_token_counts(corpus)
+    filtered_stats = compute_stage_stats(filtered_counts)
 
-    filtered_train_stats = compute_stage_stats(filtered_train_counts)
-    filtered_test_stats = compute_stage_stats(filtered_test_counts)
-
-    print_stage_stats("Train Set", filtered_train_stats)
-    print_stage_stats("Test Set", filtered_test_stats)
+    print_stage_stats("All Documents", filtered_stats)
 
     # Count documents below threshold
-    train_below_threshold = sum(1 for c in filtered_train_counts if c < min_tokens)
-    test_below_threshold = sum(1 for c in filtered_test_counts if c < min_tokens)
+    below_threshold = sum(1 for c in filtered_counts if c < min_tokens)
 
     print(f"\n  Documents with <{min_tokens} tokens:")
     print(
-        f"    Train: {train_below_threshold} ({100 * train_below_threshold / len(filtered_train_counts):.2f}%)"
-    )
-    print(
-        f"    Test: {test_below_threshold} ({100 * test_below_threshold / len(filtered_test_counts):.2f}%)"
+        f"    Count: {below_threshold} ({100 * below_threshold / len(filtered_counts):.2f}%)"
     )
 
     # Save Stage 3 artifacts
-    save_token_counts(filtered_train_counts, "train_filtered", stage=3)
-    save_token_counts(filtered_test_counts, "test_filtered", stage=3)
-    save_artifact("train_stats", filtered_train_stats, stage=3)
-    save_artifact("test_stats", filtered_test_stats, stage=3)
+    save_token_counts(filtered_counts, "filtered", stage=3)
+    save_artifact("stats", filtered_stats, stage=3)
     save_artifact("filter_info", {
         "no_below": FILTER_NO_BELOW,
         "no_above": FILTER_NO_ABOVE,
@@ -543,12 +504,9 @@ def main():
     save_artifact("removed_tokens", list(tokens_removed), stage=3)
     save_artifact("docs_below_threshold", {
         "threshold": min_tokens,
-        "train_count": train_below_threshold,
-        "train_pct": 100 * train_below_threshold / len(filtered_train_counts),
-        "test_count": test_below_threshold,
-        "test_pct": 100 * test_below_threshold / len(filtered_test_counts),
-        "train_indices": [i for i, c in enumerate(filtered_train_counts) if c < min_tokens],
-        "test_indices": [i for i, c in enumerate(filtered_test_counts) if c < min_tokens],
+        "count": below_threshold,
+        "pct": 100 * below_threshold / len(filtered_counts),
+        "indices": [i for i, c in enumerate(filtered_counts) if c < min_tokens],
     }, stage=3)
     print(f"\n  Artifacts saved to {EDA_DIR}/stage3/")
 
@@ -561,73 +519,42 @@ def main():
     print("=" * 80)
 
     # Filter documents
-    train_filtered = filter_short_documents(
-        train_tokenized, train_corpus, min_tokens
-    )
-    test_filtered = filter_short_documents(
-        test_tokenized, test_corpus, min_tokens
-    )
+    filtered_data = filter_short_documents(tokenized, corpus, min_tokens)
 
     # Get final token counts
-    final_train_counts = get_corpus_token_counts(train_filtered.corpus)
-    final_test_counts = get_corpus_token_counts(test_filtered.corpus)
-
-    final_train_stats = compute_stage_stats(final_train_counts)
-    final_test_stats = compute_stage_stats(final_test_counts)
+    final_counts = get_corpus_token_counts(filtered_data.corpus)
+    final_stats = compute_stage_stats(final_counts)
 
     print(
-        f"\n  Train: {len(train_filtered.kept_indices):,} kept, "
-        f"{len(train_filtered.removed_indices):,} removed "
-        f"({100 * len(train_filtered.removed_indices) / len(train_corpus):.2f}%)"
-    )
-    print(
-        f"  Test: {len(test_filtered.kept_indices):,} kept, "
-        f"{len(test_filtered.removed_indices):,} removed "
-        f"({100 * len(test_filtered.removed_indices) / len(test_corpus):.2f}%)"
+        f"\n  Documents: {len(filtered_data.kept_indices):,} kept, "
+        f"{len(filtered_data.removed_indices):,} removed "
+        f"({100 * len(filtered_data.removed_indices) / len(corpus):.2f}%)"
     )
 
-    print_stage_stats("Train Set (Filtered)", final_train_stats)
-    print_stage_stats("Test Set (Filtered)", final_test_stats)
+    print_stage_stats("Filtered Documents", final_stats)
 
     # Get info about removed documents
-    removed_train_info = []
-    for idx in train_filtered.removed_indices:
-        token_count = filtered_train_counts[idx]
-        removed_train_info.append({
+    removed_info = []
+    for idx in filtered_data.removed_indices:
+        token_count = filtered_counts[idx]
+        removed_info.append({
             "index": idx,
             "token_count": token_count,
-            "original_tokens": len(train_tokenized[idx]),
-        })
-
-    removed_test_info = []
-    for idx in test_filtered.removed_indices:
-        token_count = filtered_test_counts[idx]
-        removed_test_info.append({
-            "index": idx,
-            "token_count": token_count,
-            "original_tokens": len(test_tokenized[idx]),
+            "original_tokens": len(tokenized[idx]),
         })
 
     # Save Stage 4 artifacts
-    save_token_counts(final_train_counts, "train_final", stage=4)
-    save_token_counts(final_test_counts, "test_final", stage=4)
-    save_artifact("train_stats", final_train_stats, stage=4)
-    save_artifact("test_stats", final_test_stats, stage=4)
+    save_token_counts(final_counts, "final", stage=4)
+    save_artifact("stats", final_stats, stage=4)
     save_artifact("filtering_info", {
         "min_tokens_threshold": min_tokens,
-        "train_kept": len(train_filtered.kept_indices),
-        "train_removed": len(train_filtered.removed_indices),
-        "train_removed_pct": 100 * len(train_filtered.removed_indices) / len(train_corpus),
-        "test_kept": len(test_filtered.kept_indices),
-        "test_removed": len(test_filtered.removed_indices),
-        "test_removed_pct": 100 * len(test_filtered.removed_indices) / len(test_corpus),
+        "kept": len(filtered_data.kept_indices),
+        "removed": len(filtered_data.removed_indices),
+        "removed_pct": 100 * len(filtered_data.removed_indices) / len(corpus),
     }, stage=4)
-    save_artifact("train_kept_indices", train_filtered.kept_indices, stage=4)
-    save_artifact("train_removed_indices", train_filtered.removed_indices, stage=4)
-    save_artifact("test_kept_indices", test_filtered.kept_indices, stage=4)
-    save_artifact("test_removed_indices", test_filtered.removed_indices, stage=4)
-    save_artifact("removed_docs_train", removed_train_info, stage=4)
-    save_artifact("removed_docs_test", removed_test_info, stage=4)
+    save_artifact("kept_indices", filtered_data.kept_indices, stage=4)
+    save_artifact("removed_indices", filtered_data.removed_indices, stage=4)
+    save_artifact("removed_docs", removed_info, stage=4)
     print(f"\n  Artifacts saved to {EDA_DIR}/stage4/")
 
     # =========================================================================
@@ -635,25 +562,49 @@ def main():
     # =========================================================================
 
     eda_stats = {
-        "raw_train": raw_train_stats,
-        "raw_test": raw_test_stats,
-        "tokenized_train": tokenized_train_stats,
-        "tokenized_test": tokenized_test_stats,
+        "raw": raw_stats,
+        "tokenized": tokenized_stats,
         "vocab_before_filter": vocab_before,
         "vocab_after_filter": vocab_after,
         "vocab_reduction_pct": vocab_reduction,
-        "filtered_train": filtered_train_stats,
-        "filtered_test": filtered_test_stats,
-        "final_train": final_train_stats,
-        "final_test": final_test_stats,
+        "filtered": filtered_stats,
+        "final": final_stats,
         "min_tokens_threshold": min_tokens,
-        "train_docs_removed": len(train_filtered.removed_indices),
-        "test_docs_removed": len(test_filtered.removed_indices),
+        "docs_removed": len(filtered_data.removed_indices),
         "filter_no_below": FILTER_NO_BELOW,
         "filter_no_above": FILTER_NO_ABOVE,
     }
     save_eda_stats(eda_stats)
     print("\n  EDA stats saved to cache/metrics/eda_stats.json")
+
+    # =========================================================================
+    # Save box plot data
+    # =========================================================================
+
+    print("\n  Generating box plot data...")
+
+    # Collect token counts by preprocessing stage
+    stage_token_counts = {
+        "raw": raw_counts,
+        "tokenized": tokenized_counts,
+        "filtered": filtered_counts,
+        "final": final_counts,
+    }
+
+    # Collect token counts by newsgroup category (using final stage counts)
+    category_token_counts: dict[str, list[int]] = {}
+    for idx, count in zip(filtered_data.kept_indices, final_counts):
+        category = data.target_names[data.target[idx]]
+        if category not in category_token_counts:
+            category_token_counts[category] = []
+        category_token_counts[category].append(count)
+
+    box_plot_data = {
+        "stage_token_counts": stage_token_counts,
+        "category_token_counts": category_token_counts,
+    }
+    save_box_plot_data(box_plot_data)
+    print("  Box plot data saved to cache/metrics/box_plot_data.json")
 
     # =========================================================================
     # Save filtered data (if requested)
@@ -665,43 +616,34 @@ def main():
         print("=" * 80)
 
         # Save filtered tokenized docs
-        save_tokenized_docs(train_filtered.tokenized_docs, "train_filtered")
-        save_tokenized_docs(test_filtered.tokenized_docs, "test_filtered")
+        save_tokenized_docs(filtered_data.tokenized_docs)
 
         # Save filtered corpus
-        save_corpus(train_filtered.corpus, "train_filtered")
-        save_corpus(test_filtered.corpus, "test_filtered")
+        save_corpus(filtered_data.corpus)
 
         # Save indices for reference
         indices_path = MODELS_DIR / "filter_indices.json"
         with open(indices_path, "w") as f:
             json.dump(
                 {
-                    "train_kept": train_filtered.kept_indices,
-                    "train_removed": train_filtered.removed_indices,
-                    "test_kept": test_filtered.kept_indices,
-                    "test_removed": test_filtered.removed_indices,
+                    "kept": filtered_data.kept_indices,
+                    "removed": filtered_data.removed_indices,
                     "min_tokens": min_tokens,
                 },
                 f,
             )
 
         # Save newsgroup labels for filtered documents
-        train_labels = [
-            train_data.target_names[train_data.target[idx]]
-            for idx in train_filtered.kept_indices
+        labels = [
+            data.target_names[data.target[idx]]
+            for idx in filtered_data.kept_indices
         ]
-        test_labels = [
-            test_data.target_names[test_data.target[idx]]
-            for idx in test_filtered.kept_indices
-        ]
-        save_document_labels(train_labels, "train")
-        save_document_labels(test_labels, "test")
+        save_document_labels(labels)
 
-        print(f"  Saved filtered tokenized docs (train_filtered, test_filtered)")
-        print(f"  Saved filtered corpus (train_filtered, test_filtered)")
+        print(f"  Saved filtered tokenized docs")
+        print(f"  Saved filtered corpus")
         print(f"  Saved filter indices to {indices_path}")
-        print(f"  Saved document labels (train: {len(train_labels)}, test: {len(test_labels)})")
+        print(f"  Saved document labels ({len(labels)} documents)")
 
     # =========================================================================
     # Summary
@@ -715,13 +657,12 @@ def main():
 
     print("\nSummary:")
     print("-" * 40)
-    print(f"  Raw train docs: {raw_train_stats['n_documents']:,}")
-    print(f"  After preprocessing: {tokenized_train_stats['n_documents']:,}")
-    print(f"  After filter_extremes: {filtered_train_stats['n_documents']:,}")
-    print(f"  After doc filtering: {final_train_stats['n_documents']:,}")
+    print(f"  Raw docs: {raw_stats['n_documents']:,}")
+    print(f"  After preprocessing: {tokenized_stats['n_documents']:,}")
+    print(f"  After filter_extremes: {filtered_stats['n_documents']:,}")
+    print(f"  After doc filtering: {final_stats['n_documents']:,}")
     print(f"\n  Vocabulary reduction: {vocab_before:,} -> {vocab_after:,} ({vocab_reduction:.1f}%)")
-    print(f"  Documents removed (train): {len(train_filtered.removed_indices)}")
-    print(f"  Documents removed (test): {len(test_filtered.removed_indices)}")
+    print(f"  Documents removed: {len(filtered_data.removed_indices)}")
 
     print(f"\nArtifacts saved to: {EDA_DIR}/")
     print("  stage1/ - Raw document token counts")

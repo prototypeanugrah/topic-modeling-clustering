@@ -12,3 +12,8 @@ wheels/
 
 # uv
 uv.lock
+
+# System files
+CLAUDE.md
+frontend-skills.md
+*.pkl

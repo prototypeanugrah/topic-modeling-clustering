@@ -16,28 +16,20 @@ class StatusResponse(BaseModel):
 
     complete: bool
     dictionary: bool
-    corpus_train: bool
-    corpus_test: bool
-    tokenized_train: bool
-    tokenized_test: bool
-    coherence_val: bool
-    coherence_test: bool
+    corpus: bool
+    tokenized: bool
+    coherence: bool
     models: dict[int, bool]
-    distributions_train: dict[int, bool]
-    distributions_test: dict[int, bool]
-    projections_train: dict[int, bool]
-    projections_test: dict[int, bool]
+    distributions: dict[int, bool]
+    projections: dict[int, bool]
 
 
 class CoherenceResponse(BaseModel):
-    """Response for coherence scores endpoint with val and test scores."""
+    """Response for coherence scores endpoint."""
 
     topic_counts: list[int]
-    # Validation scores (averaged from 5-fold CV)
-    coherence_val: list[float]
-    # Test scores (final evaluation on held-out set)
-    coherence_test: list[float]
-    optimal_topics: int  # Based on test coherence
+    coherence: list[float]
+    optimal_topics: int
 
 
 class TopicWord(BaseModel):
@@ -81,7 +73,6 @@ class VisualizationResponse(BaseModel):
     n_topics: int
     projections: list[list[float]]  # [[x, y], ...]
     document_ids: list[int]
-    dataset: str = "train"  # "train" or "test"
 
 
 class DocumentTopicInfo(BaseModel):
@@ -99,7 +90,6 @@ class ClusteredVisualizationResponse(BaseModel):
     projections: list[list[float]]  # [[x, y], ...]
     cluster_labels: list[int]
     document_ids: list[int]
-    dataset: str = "train"  # "train" or "test"
 
     # Optional enrichment fields for tooltip
     newsgroup_labels: Optional[list[str]] = None  # Original 20 newsgroups labels
@@ -146,27 +136,32 @@ class EDAResponse(BaseModel):
     """Full EDA response with 4 preprocessing stages."""
 
     # Stage 1: Raw documents (token counts via whitespace split)
-    raw_train: StageStats
-    raw_test: StageStats
+    raw: StageStats
 
     # Stage 2: Tokenized (after preprocessing, before filter_extremes)
     vocab_before_filter: int
-    tokenized_train: StageStats
-    tokenized_test: StageStats
+    tokenized: StageStats
 
     # Stage 3: After filter_extremes
     vocab_after_filter: int
-    filtered_train: StageStats
-    filtered_test: StageStats
+    filtered: StageStats
     vocab_reduction_pct: float
 
     # Stage 4: After document filtering (final corpus)
-    final_train: StageStats
-    final_test: StageStats
+    final: StageStats
     min_tokens_threshold: int
-    train_docs_removed: int
-    test_docs_removed: int
+    docs_removed: int
 
     # Filter settings used
     filter_no_below: int
     filter_no_above: float
+
+
+class BoxPlotData(BaseModel):
+    """Box plot data for EDA visualizations."""
+
+    # Token counts by preprocessing stage (raw arrays for Plotly box plots)
+    stage_token_counts: dict[str, list[int]]  # {"raw": [...], "tokenized": [...], "filtered": [...], "final": [...]}
+
+    # Token counts by newsgroup category
+    category_token_counts: dict[str, list[int]]  # {"alt.atheism": [...], "comp.graphics": [...], ...}

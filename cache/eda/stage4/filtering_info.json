@@ -1,0 +1,6 @@
+{
+  "min_tokens_threshold": 8,
+  "kept": 16742,
+  "removed": 2104,
+  "removed_pct": 11.164172768757297
+}
