@@ -12,6 +12,9 @@ DISTRIBUTIONS_DIR = CACHE_DIR / "distributions"
 PROJECTIONS_DIR = CACHE_DIR / "projections"
 METRICS_DIR = CACHE_DIR / "metrics"
 PYLDAVIS_DIR = CACHE_DIR / "pyldavis"
+TOPICS_DIR = CACHE_DIR / "topics"
+CLUSTERS_DIR = CACHE_DIR / "clusters"
+ENRICHMENT_DIR = CACHE_DIR / "enrichment"
 
 # LDA settings
 MIN_TOPICS = 2

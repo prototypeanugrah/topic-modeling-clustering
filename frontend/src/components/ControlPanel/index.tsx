@@ -27,29 +27,34 @@ export function ControlPanel({
   maxClusters = 15,
 }: ControlPanelProps) {
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6 space-y-6">
-      <div className="flex items-center gap-2">
-        <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div
+      className="terminal-panel lg:shadow-none lg:border-0 lg:rounded-none"
+      style={{ background: 'var(--bg-card)' }}
+    >
+      <div className="terminal-panel-header lg:hidden">
+        <svg className="w-4 h-4" style={{ color: 'var(--accent-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
         </svg>
-        <h2 className="text-lg font-semibold text-gray-800">Controls</h2>
+        Controls
       </div>
 
-      <TopicSlider
-        value={nTopics}
-        onChange={onTopicsChange}
-        min={minTopics}
-        max={maxTopics}
-        optimalValue={optimalTopics}
-      />
+      <div className="terminal-panel-content lg:p-0 space-y-6">
+        <TopicSlider
+          value={nTopics}
+          onChange={onTopicsChange}
+          min={minTopics}
+          max={maxTopics}
+          optimalValue={optimalTopics}
+        />
 
-      <ClusterSlider
-        value={nClusters}
-        onChange={onClustersChange}
-        min={minClusters}
-        max={maxClusters}
-        optimalValue={optimalClusters}
-      />
+        <ClusterSlider
+          value={nClusters}
+          onChange={onClustersChange}
+          min={minClusters}
+          max={maxClusters}
+          optimalValue={optimalClusters}
+        />
+      </div>
     </div>
   );
 }

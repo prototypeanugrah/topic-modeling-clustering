@@ -16,6 +16,9 @@ from backend.config import (
     PROJECTIONS_DIR,
     METRICS_DIR,
     PYLDAVIS_DIR,
+    TOPICS_DIR,
+    CLUSTERS_DIR,
+    ENRICHMENT_DIR,
     MIN_TOPICS,
     MAX_TOPICS,
 )
@@ -23,7 +26,16 @@ from backend.config import (
 
 def ensure_cache_dirs() -> None:
     """Create cache directories if they don't exist."""
-    for dir_path in [MODELS_DIR, DISTRIBUTIONS_DIR, PROJECTIONS_DIR, METRICS_DIR, PYLDAVIS_DIR]:
+    for dir_path in [
+        MODELS_DIR,
+        DISTRIBUTIONS_DIR,
+        PROJECTIONS_DIR,
+        METRICS_DIR,
+        PYLDAVIS_DIR,
+        TOPICS_DIR,
+        CLUSTERS_DIR,
+        ENRICHMENT_DIR,
+    ]:
         dir_path.mkdir(parents=True, exist_ok=True)
 
 
@@ -43,54 +55,44 @@ def load_dictionary() -> corpora.Dictionary | None:
     return None
 
 
-def save_corpus(corpus: list, dataset: str = "train") -> Path:
+def save_corpus(corpus: list) -> Path:
     """Save corpus to cache.
 
     Args:
         corpus: Bag-of-words corpus
-        dataset: 'train' or 'test'
     """
     ensure_cache_dirs()
-    path = MODELS_DIR / f"corpus_{dataset}.pkl"
+    path = MODELS_DIR / "corpus.pkl"
     with open(path, "wb") as f:
         pickle.dump(corpus, f)
     return path
 
 
-def load_corpus(dataset: str = "train") -> list | None:
-    """Load corpus from cache.
-
-    Args:
-        dataset: 'train' or 'test'
-    """
-    path = MODELS_DIR / f"corpus_{dataset}.pkl"
+def load_corpus() -> list | None:
+    """Load corpus from cache."""
+    path = MODELS_DIR / "corpus.pkl"
     if path.exists():
         with open(path, "rb") as f:
             return pickle.load(f)
     return None
 
 
-def save_tokenized_docs(tokenized_docs: list[list[str]], dataset: str = "train") -> Path:
+def save_tokenized_docs(tokenized_docs: list[list[str]]) -> Path:
     """Save tokenized documents to cache.
 
     Args:
         tokenized_docs: List of tokenized documents
-        dataset: 'train' or 'test'
     """
     ensure_cache_dirs()
-    path = MODELS_DIR / f"tokenized_{dataset}.pkl"
+    path = MODELS_DIR / "tokenized.pkl"
     with open(path, "wb") as f:
         pickle.dump(tokenized_docs, f)
     return path
 
 
-def load_tokenized_docs(dataset: str = "train") -> list[list[str]] | None:
-    """Load tokenized documents from cache.
-
-    Args:
-        dataset: 'train' or 'test'
-    """
-    path = MODELS_DIR / f"tokenized_{dataset}.pkl"
+def load_tokenized_docs() -> list[list[str]] | None:
+    """Load tokenized documents from cache."""
+    path = MODELS_DIR / "tokenized.pkl"
     if path.exists():
         with open(path, "rb") as f:
             return pickle.load(f)
@@ -113,69 +115,64 @@ def load_lda_model(num_topics: int) -> LdaModel | None:
     return None
 
 
-def save_doc_topic_distribution(dist: np.ndarray, num_topics: int, dataset: str = "train") -> Path:
+def save_doc_topic_distribution(dist: np.ndarray, num_topics: int) -> Path:
     """Save document-topic distribution to cache.
 
     Args:
         dist: Document-topic distribution matrix
         num_topics: Number of topics
-        dataset: 'train' or 'test'
     """
     ensure_cache_dirs()
-    path = DISTRIBUTIONS_DIR / f"doc_topic_{dataset}_k{num_topics}.npy"
+    path = DISTRIBUTIONS_DIR / f"doc_topic_k{num_topics}.npy"
     np.save(path, dist)
     return path
 
 
-def load_doc_topic_distribution(num_topics: int, dataset: str = "train") -> np.ndarray | None:
+def load_doc_topic_distribution(num_topics: int) -> np.ndarray | None:
     """Load document-topic distribution from cache.
 
     Args:
         num_topics: Number of topics
-        dataset: 'train' or 'test'
     """
-    path = DISTRIBUTIONS_DIR / f"doc_topic_{dataset}_k{num_topics}.npy"
+    path = DISTRIBUTIONS_DIR / f"doc_topic_k{num_topics}.npy"
     if path.exists():
         return np.load(path)
     return None
 
 
-def save_umap_projection(projection: np.ndarray, num_topics: int, dataset: str = "train") -> Path:
+def save_umap_projection(projection: np.ndarray, num_topics: int) -> Path:
     """Save UMAP projection to cache.
 
     Args:
         projection: UMAP 2D projection
         num_topics: Number of topics
-        dataset: 'train' or 'test'
     """
     ensure_cache_dirs()
-    path = PROJECTIONS_DIR / f"umap_{dataset}_k{num_topics}.npy"
+    path = PROJECTIONS_DIR / f"umap_k{num_topics}.npy"
     np.save(path, projection)
     return path
 
 
-def load_umap_projection(num_topics: int, dataset: str = "train") -> np.ndarray | None:
+def load_umap_projection(num_topics: int) -> np.ndarray | None:
     """Load UMAP projection from cache.
 
     Args:
         num_topics: Number of topics
-        dataset: 'train' or 'test'
     """
-    path = PROJECTIONS_DIR / f"umap_{dataset}_k{num_topics}.npy"
+    path = PROJECTIONS_DIR / f"umap_k{num_topics}.npy"
     if path.exists():
         return np.load(path)
     return None
 
 
-def save_coherence_scores(scores: dict[int, float], split: str = "test") -> Path:
+def save_coherence_scores(scores: dict[int, float]) -> Path:
     """Save coherence scores to cache.
 
     Args:
         scores: Dictionary mapping topic count to coherence score
-        split: 'val' (averaged from CV) or 'test' (final evaluation)
     """
     ensure_cache_dirs()
-    path = METRICS_DIR / f"coherence_{split}.json"
+    path = METRICS_DIR / "coherence.json"
     # Convert int keys to strings for JSON
     json_scores = {str(k): v for k, v in scores.items()}
     with open(path, "w") as f:
@@ -183,13 +180,9 @@ def save_coherence_scores(scores: dict[int, float], split: str = "test") -> Path
     return path
 
 
-def load_coherence_scores(split: str = "test") -> dict[int, float] | None:
-    """Load coherence scores from cache.
-
-    Args:
-        split: 'val' (averaged from CV) or 'test' (final evaluation)
-    """
-    path = METRICS_DIR / f"coherence_{split}.json"
+def load_coherence_scores() -> dict[int, float] | None:
+    """Load coherence scores from cache."""
+    path = METRICS_DIR / "coherence.json"
     if path.exists():
         with open(path, "r") as f:
             json_scores = json.load(f)
@@ -204,28 +197,24 @@ def is_cache_complete() -> bool:
     if not (MODELS_DIR / "dictionary.pkl").exists():
         return False
 
-    # Check train and test corpora and tokenized docs
-    for dataset in ["train", "test"]:
-        if not (MODELS_DIR / f"corpus_{dataset}.pkl").exists():
-            return False
-        if not (MODELS_DIR / f"tokenized_{dataset}.pkl").exists():
-            return False
+    # Check corpus and tokenized docs
+    if not (MODELS_DIR / "corpus.pkl").exists():
+        return False
+    if not (MODELS_DIR / "tokenized.pkl").exists():
+        return False
 
     # Check LDA models and distributions for all topic counts
     for n in range(MIN_TOPICS, MAX_TOPICS + 1):
         if not (MODELS_DIR / f"lda_k{n}.pkl").exists():
             return False
-        # Check train and test distributions and projections
-        for dataset in ["train", "test"]:
-            if not (DISTRIBUTIONS_DIR / f"doc_topic_{dataset}_k{n}.npy").exists():
-                return False
-            if not (PROJECTIONS_DIR / f"umap_{dataset}_k{n}.npy").exists():
-                return False
-
-    # Check val and test coherence scores
-    for split in ["val", "test"]:
-        if not (METRICS_DIR / f"coherence_{split}.json").exists():
+        if not (DISTRIBUTIONS_DIR / f"doc_topic_k{n}.npy").exists():
             return False
+        if not (PROJECTIONS_DIR / f"umap_k{n}.npy").exists():
+            return False
+
+    # Check coherence scores
+    if not (METRICS_DIR / "coherence.json").exists():
+        return False
 
     return True
 
@@ -235,25 +224,18 @@ def get_cache_status() -> dict[str, Any]:
     status = {
         "complete": is_cache_complete(),
         "dictionary": (MODELS_DIR / "dictionary.pkl").exists(),
-        "corpus_train": (MODELS_DIR / "corpus_train.pkl").exists(),
-        "corpus_test": (MODELS_DIR / "corpus_test.pkl").exists(),
-        "tokenized_train": (MODELS_DIR / "tokenized_train.pkl").exists(),
-        "tokenized_test": (MODELS_DIR / "tokenized_test.pkl").exists(),
-        "coherence_val": (METRICS_DIR / "coherence_val.json").exists(),
-        "coherence_test": (METRICS_DIR / "coherence_test.json").exists(),
+        "corpus": (MODELS_DIR / "corpus.pkl").exists(),
+        "tokenized": (MODELS_DIR / "tokenized.pkl").exists(),
+        "coherence": (METRICS_DIR / "coherence.json").exists(),
         "models": {},
-        "distributions_train": {},
-        "distributions_test": {},
-        "projections_train": {},
-        "projections_test": {},
+        "distributions": {},
+        "projections": {},
     }
 
     for n in range(MIN_TOPICS, MAX_TOPICS + 1):
         status["models"][n] = (MODELS_DIR / f"lda_k{n}.pkl").exists()
-        status["distributions_train"][n] = (DISTRIBUTIONS_DIR / f"doc_topic_train_k{n}.npy").exists()
-        status["distributions_test"][n] = (DISTRIBUTIONS_DIR / f"doc_topic_test_k{n}.npy").exists()
-        status["projections_train"][n] = (PROJECTIONS_DIR / f"umap_train_k{n}.npy").exists()
-        status["projections_test"][n] = (PROJECTIONS_DIR / f"umap_test_k{n}.npy").exists()
+        status["distributions"][n] = (DISTRIBUTIONS_DIR / f"doc_topic_k{n}.npy").exists()
+        status["projections"][n] = (PROJECTIONS_DIR / f"umap_k{n}.npy").exists()
 
     return status
 
@@ -306,30 +288,55 @@ def load_eda_stats() -> dict | None:
     return None
 
 
-def save_document_labels(labels: list[str], dataset: str = "train") -> Path:
-    """Save newsgroup labels for filtered documents.
+def save_document_labels(labels: list[str]) -> Path:
+    """Save newsgroup labels for documents.
 
     Args:
         labels: List of newsgroup label strings (e.g., ["alt.atheism", "sci.space", ...])
-        dataset: 'train' or 'test'
     """
     ensure_cache_dirs()
-    path = MODELS_DIR / f"labels_{dataset}.json"
+    path = MODELS_DIR / "labels.json"
     with open(path, "w") as f:
         json.dump(labels, f)
     return path
 
 
-def load_document_labels(dataset: str = "train") -> list[str] | None:
-    """Load newsgroup labels for filtered documents.
-
-    Args:
-        dataset: 'train' or 'test'
+def load_document_labels() -> list[str] | None:
+    """Load newsgroup labels for documents.
 
     Returns:
         List of newsgroup label strings, or None if not cached
     """
-    path = MODELS_DIR / f"labels_{dataset}.json"
+    path = MODELS_DIR / "labels.json"
+    if path.exists():
+        with open(path, "r") as f:
+            return json.load(f)
+    return None
+
+
+def save_box_plot_data(data: dict) -> Path:
+    """Save box plot data for EDA visualizations.
+
+    Args:
+        data: Dictionary with token counts by stage and category
+
+    Returns:
+        Path to saved file
+    """
+    ensure_cache_dirs()
+    path = METRICS_DIR / "box_plot_data.json"
+    with open(path, "w") as f:
+        json.dump(data, f)
+    return path
+
+
+def load_box_plot_data() -> dict | None:
+    """Load box plot data for EDA visualizations.
+
+    Returns:
+        Dictionary with token counts, or None if not cached
+    """
+    path = METRICS_DIR / "box_plot_data.json"
     if path.exists():
         with open(path, "r") as f:
             return json.load(f)
@@ -340,8 +347,120 @@ def clear_cache() -> None:
     """Clear all cached artifacts."""
     import shutil
 
-    for dir_path in [MODELS_DIR, DISTRIBUTIONS_DIR, PROJECTIONS_DIR, METRICS_DIR, PYLDAVIS_DIR]:
+    for dir_path in [
+        MODELS_DIR,
+        DISTRIBUTIONS_DIR,
+        PROJECTIONS_DIR,
+        METRICS_DIR,
+        PYLDAVIS_DIR,
+        TOPICS_DIR,
+        CLUSTERS_DIR,
+        ENRICHMENT_DIR,
+    ]:
         if dir_path.exists():
             shutil.rmtree(dir_path)
 
     ensure_cache_dirs()
+
+
+# === Topic Words Cache ===
+
+
+def save_topic_words(words: dict, num_topics: int) -> Path:
+    """Save precomputed topic words to cache.
+
+    Args:
+        words: Dictionary with n_topics and topics list
+        num_topics: Number of topics
+    """
+    ensure_cache_dirs()
+    path = TOPICS_DIR / f"words_k{num_topics}.json"
+    with open(path, "w") as f:
+        json.dump(words, f)
+    return path
+
+
+def load_topic_words(num_topics: int) -> dict | None:
+    """Load precomputed topic words from cache."""
+    path = TOPICS_DIR / f"words_k{num_topics}.json"
+    if path.exists():
+        with open(path, "r") as f:
+            return json.load(f)
+    return None
+
+
+# === Cluster Metrics Cache ===
+
+
+def save_cluster_metrics(metrics: dict, num_topics: int) -> Path:
+    """Save precomputed cluster metrics to cache.
+
+    Args:
+        metrics: Dictionary with cluster metrics (silhouette, inertia, etc.)
+        num_topics: Number of topics
+    """
+    ensure_cache_dirs()
+    path = METRICS_DIR / f"cluster_metrics_k{num_topics}.json"
+    with open(path, "w") as f:
+        json.dump(metrics, f)
+    return path
+
+
+def load_cluster_metrics(num_topics: int) -> dict | None:
+    """Load precomputed cluster metrics from cache."""
+    path = METRICS_DIR / f"cluster_metrics_k{num_topics}.json"
+    if path.exists():
+        with open(path, "r") as f:
+            return json.load(f)
+    return None
+
+
+# === Cluster Labels Cache ===
+
+
+def save_cluster_labels(labels: np.ndarray, num_topics: int, num_clusters: int) -> Path:
+    """Save precomputed cluster labels to cache.
+
+    Args:
+        labels: Cluster label array for each document
+        num_topics: Number of topics
+        num_clusters: Number of clusters
+    """
+    ensure_cache_dirs()
+    path = CLUSTERS_DIR / f"labels_k{num_topics}_c{num_clusters}.npy"
+    np.save(path, labels)
+    return path
+
+
+def load_cluster_labels(num_topics: int, num_clusters: int) -> np.ndarray | None:
+    """Load precomputed cluster labels from cache."""
+    path = CLUSTERS_DIR / f"labels_k{num_topics}_c{num_clusters}.npy"
+    if path.exists():
+        return np.load(path)
+    return None
+
+
+# === Document Enrichment Cache ===
+
+
+def save_document_enrichment(enrichment: dict, num_topics: int) -> Path:
+    """Save precomputed document enrichment data to cache.
+
+    Args:
+        enrichment: Dictionary with top_topics and dominant_topic_words
+        num_topics: Number of topics
+    """
+    ensure_cache_dirs()
+    path = ENRICHMENT_DIR / f"docs_k{num_topics}.json"
+    with open(path, "w") as f:
+        json.dump(enrichment, f)
+    return path
+
+
+def load_document_enrichment(num_topics: int) -> dict | None:
+    """Load precomputed document enrichment data from cache."""
+    path = ENRICHMENT_DIR / f"docs_k{num_topics}.json"
+    if path.exists():
+        with open(path, "r") as f:
+            return json.load(f)
+    return None

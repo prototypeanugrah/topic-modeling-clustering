@@ -24,7 +24,7 @@ An interactive web dashboard for exploring topic distributions and document clus
 - **LDA Topic Modeling** with coherence scores
 - **K-Means Clustering** with silhouette scores and elbow detection
 
-- **Interactive Charts**: Coherence plot, silhouette/inertia plot
+- **Interactive Charts**: Coherence plot, silhouette/inertia plot, token distribution box plots
 - **UMAP Scatter Plot**: 2D visualization of clustered documents
 - **Topic Word Lists**: Top words per topic with probabilities
 - **pyLDAvis Integration**: Interactive topic-word distribution explorer

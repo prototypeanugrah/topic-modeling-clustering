@@ -3,6 +3,7 @@
 import pytest
 from backend.core.data_loader import (
     load_20newsgroups,
+    load_all_data,
     get_document_count,
     get_category_distribution,
     NewsGroupsData,
@@ -43,10 +44,17 @@ class TestLoad20Newsgroups:
         assert 10000 < len(data.documents) < 12000
 
     def test_load_subset_all(self):
-        """All subset should be larger than train."""
-        train_data = load_20newsgroups(subset="train")
+        """All subset should have all documents (~18,846)."""
         all_data = load_20newsgroups(subset="all")
-        assert len(all_data.documents) > len(train_data.documents)
+        # All set has ~18,846 documents (11,314 train + 7,532 test)
+        assert 18000 < len(all_data.documents) < 20000
+
+    def test_load_all_data(self):
+        """load_all_data should load all documents."""
+        data = load_all_data()
+        assert isinstance(data, NewsGroupsData)
+        # Should have ~18,846 documents
+        assert 18000 < len(data.documents) < 20000
 
 
 class TestGetDocumentCount:

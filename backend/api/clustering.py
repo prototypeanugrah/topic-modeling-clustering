@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 
-from backend.cache.manager import load_doc_topic_distribution
+from backend.cache.manager import load_doc_topic_distribution, load_cluster_metrics
 from backend.core.clustering import perform_kmeans, get_cluster_sizes
 from backend.core.metrics import calculate_silhouette, compute_metrics_for_all_clusters
 from backend.models.requests import ClusteringRequest
@@ -63,6 +63,19 @@ async def get_cluster_metrics(
             detail=f"n_topics must be between {MIN_TOPICS} and {MAX_TOPICS}"
         )
 
+    # Try precomputed cache first (if requesting default range)
+    if min_clusters == MIN_CLUSTERS and max_clusters == MAX_CLUSTERS:
+        cached = load_cluster_metrics(n_topics)
+        if cached is not None:
+            return ClusterMetricsResponse(
+                n_topics=n_topics,
+                cluster_counts=cached["cluster_counts"],
+                silhouette_scores=cached["silhouette_scores"],
+                inertia_scores=cached["inertia_scores"],
+                elbow_point=cached["elbow_point"],
+            )
+
+    # Fallback to runtime computation (custom ranges or missing cache)
     if min_clusters < MIN_CLUSTERS:
         min_clusters = MIN_CLUSTERS
     if max_clusters > MAX_CLUSTERS:

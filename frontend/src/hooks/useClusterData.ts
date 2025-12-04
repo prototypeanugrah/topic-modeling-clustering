@@ -13,12 +13,11 @@ const swrConfig = {
 
 export function useClusteredVisualization(
   nTopics: number,
-  nClusters: number,
-  dataset: "train" | "test" = "train"
+  nClusters: number
 ) {
   // Use array key for POST requests with SWR
   const { data, error, isLoading, isValidating } = useSWR<ClusteredVisualizationResponse>(
-    ["/visualization/clustered", { n_topics: nTopics, n_clusters: nClusters, dataset }],
+    ["/visualization/clustered", { n_topics: nTopics, n_clusters: nClusters }],
     swrPostFetcher,
     swrConfig
   );
@@ -28,25 +27,22 @@ export function useClusteredVisualization(
     const timer = setTimeout(() => {
       // Prefetch adjacent topic counts with same cluster count
       if (nTopics > 2) {
-        prefetchPost("/visualization/clustered", { n_topics: nTopics - 1, n_clusters: nClusters, dataset });
+        prefetchPost("/visualization/clustered", { n_topics: nTopics - 1, n_clusters: nClusters });
       }
       if (nTopics < 20) {
-        prefetchPost("/visualization/clustered", { n_topics: nTopics + 1, n_clusters: nClusters, dataset });
+        prefetchPost("/visualization/clustered", { n_topics: nTopics + 1, n_clusters: nClusters });
       }
       // Prefetch adjacent cluster counts with same topic count
       if (nClusters > 2) {
-        prefetchPost("/visualization/clustered", { n_topics: nTopics, n_clusters: nClusters - 1, dataset });
+        prefetchPost("/visualization/clustered", { n_topics: nTopics, n_clusters: nClusters - 1 });
       }
       if (nClusters < 15) {
-        prefetchPost("/visualization/clustered", { n_topics: nTopics, n_clusters: nClusters + 1, dataset });
+        prefetchPost("/visualization/clustered", { n_topics: nTopics, n_clusters: nClusters + 1 });
       }
-      // Prefetch the other dataset (train/test toggle)
-      const otherDataset = dataset === "train" ? "test" : "train";
-      prefetchPost("/visualization/clustered", { n_topics: nTopics, n_clusters: nClusters, dataset: otherDataset });
     }, 200);  // Slightly longer delay for visualization (larger payload)
 
     return () => clearTimeout(timer);
-  }, [nTopics, nClusters, dataset]);
+  }, [nTopics, nClusters]);
 
   return {
     data: data ?? null,
