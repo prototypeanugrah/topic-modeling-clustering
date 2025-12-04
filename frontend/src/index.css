@@ -1,17 +1,128 @@
 @import "tailwindcss";
 
+/* ============================================
+   INDUSTRIAL/TERMINAL DESIGN SYSTEM
+   ============================================ */
+
+/* CSS Variables - Light Mode (Default) */
 :root {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  /* Typography */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  /* Background colors - industrial cream/grey */
+  --bg-primary: #f5f5f0;
+  --bg-secondary: #e8e8e3;
+  --bg-card: #ffffff;
+  --bg-elevated: #fafaf8;
+
+  /* Text colors */
+  --text-primary: #1a1a1a;
+  --text-secondary: #4a4a4a;
+  --text-muted: #6b6b6b;
+
+  /* Accent colors */
+  --accent-primary: #ff6b35;
+  --accent-primary-hover: #e55a2b;
+  --accent-secondary: #00d4aa;
+  --accent-secondary-hover: #00b894;
+  --accent-tertiary: #58a6ff;
+
+  /* Status colors */
+  --status-success: #00d4aa;
+  --status-warning: #d29922;
+  --status-error: #f85149;
+  --status-info: #58a6ff;
+
+  /* Border & Shadow */
+  --border-color: #d0d0c8;
+  --border-subtle: #e5e5e0;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  --shadow-glow: 0 0 20px rgba(255, 107, 53, 0.15);
+
+  /* Chart colors */
+  --chart-grid: #e5e5e0;
+  --chart-axis: #4a4a4a;
+  --chart-bg: #ffffff;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 350ms ease;
+
+  /* Spacing */
+  --panel-radius: 4px;
+  --panel-padding: 1.5rem;
+
   line-height: 1.5;
   font-weight: 400;
   color-scheme: light;
 }
 
+/* Dark Mode */
+.dark {
+  /* Background colors - terminal/command center */
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-card: #21262d;
+  --bg-elevated: #2d333b;
+
+  /* Text colors */
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+
+  /* Border & Shadow */
+  --border-color: #30363d;
+  --border-subtle: #21262d;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 20px rgba(255, 107, 53, 0.25);
+
+  /* Chart colors */
+  --chart-grid: #30363d;
+  --chart-axis: #8b949e;
+  --chart-bg: #21262d;
+
+  color-scheme: dark;
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #f8fafc;
+  font-family: var(--font-display);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color var(--transition-normal), color var(--transition-normal);
+}
+
+/* Subtle grid background pattern */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: -1;
+  background-image:
+    linear-gradient(var(--border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.5;
+}
+
+.dark body::before {
+  opacity: 0.3;
 }
 
 #root {
@@ -19,68 +130,431 @@ body {
   min-height: 100vh;
 }
 
-/* Custom scrollbar */
+/* ============================================
+   TYPOGRAPHY
+   ============================================ */
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* ============================================
+   TERMINAL PANEL COMPONENT
+   ============================================ */
+
+.terminal-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.terminal-panel:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.terminal-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.terminal-panel-header::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: var(--accent-secondary);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--accent-secondary);
+}
+
+.terminal-panel-content {
+  padding: var(--panel-padding);
+}
+
+/* ============================================
+   STATUS INDICATOR
+   ============================================ */
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.status-dot--active {
+  background: var(--accent-secondary);
+  box-shadow: 0 0 6px var(--accent-secondary);
+}
+
+.status-dot--warning {
+  background: var(--status-warning);
+  box-shadow: 0 0 6px var(--status-warning);
+}
+
+.status-dot--error {
+  background: var(--status-error);
+  box-shadow: 0 0 6px var(--status-error);
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ============================================
+   DATA DISPLAY
+   ============================================ */
+
+.data-value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-label {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+/* ============================================
+   CUSTOM SCROLLBAR
+   ============================================ */
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--bg-secondary);
   border-radius: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--border-color);
   border-radius: 3px;
+  transition: background var(--transition-fast);
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--text-muted);
 }
 
-/* Range slider styling */
+/* ============================================
+   INDUSTRIAL RANGE SLIDER
+   ============================================ */
+
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
-  height: 6px;
-  background: #e2e8f0;
-  border-radius: 3px;
+  height: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 2px;
   outline: none;
+  transition: background var(--transition-fast);
 }
 
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  background: var(--accent-primary);
+  border: 2px solid var(--bg-card);
+  border-radius: 2px;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 0 1px var(--border-color);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.1);
-  box-shadow: 0 3px 8px rgba(99, 102, 241, 0.5);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.25), 0 0 8px var(--accent-primary);
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  background: var(--accent-primary);
+  border: 2px solid var(--bg-card);
+  border-radius: 2px;
   cursor: pointer;
-  border: none;
-  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
 }
 
-/* Card hover effects */
+input[type="range"]:focus {
+  outline: none;
+}
+
+input[type="range"]:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.3);
+}
+
+/* ============================================
+   BUTTON STYLES
+   ============================================ */
+
+.btn-industrial {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.5rem 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 2px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-industrial:hover {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+  box-shadow: 0 0 12px rgba(255, 107, 53, 0.3);
+}
+
+.btn-industrial--active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+}
+
+/* ============================================
+   TABLE STYLES
+   ============================================ */
+
+.terminal-table {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  border-collapse: collapse;
+}
+
+.terminal-table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.terminal-table td {
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.terminal-table tr:hover td {
+  background: var(--bg-secondary);
+}
+
+/* ============================================
+   CIRCULAR CONTROL BUTTONS
+   ============================================ */
+
+.btn-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.btn-circle:hover:not(:disabled) {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+}
+
+.btn-circle:disabled {
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.terminal-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* ============================================
+   CARD HOVER EFFECTS
+   ============================================ */
+
 .hover-lift {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .hover-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ============================================
+   LOADING STATES
+   ============================================ */
+
+.terminal-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.terminal-loading::before {
+  content: '>';
+  animation: blink 1s step-end infinite;
+}
+
+.terminal-loading::after {
+  content: '_';
+  animation: blink 0.5s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Loading bar */
+.loading-bar {
+  height: 2px;
+  background: var(--bg-secondary);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.loading-bar-progress {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  animation: loading-slide 1.5s ease-in-out infinite;
+}
+
+@keyframes loading-slide {
+  0% { transform: translateX(-100%); width: 30%; }
+  50% { transform: translateX(100%); width: 50%; }
+  100% { transform: translateX(300%); width: 30%; }
+}
+
+/* ============================================
+   STAGGERED ANIMATIONS
+   ============================================ */
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Stagger delays */
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.2s; }
+.delay-3 { animation-delay: 0.3s; }
+.delay-4 { animation-delay: 0.4s; }
+.delay-5 { animation-delay: 0.5s; }
+
+/* ============================================
+   GLOW EFFECTS
+   ============================================ */
+
+.glow-accent {
+  box-shadow: 0 0 15px rgba(255, 107, 53, 0.2);
+}
+
+.glow-success {
+  box-shadow: 0 0 15px rgba(0, 212, 170, 0.2);
+}
+
+/* ============================================
+   NOISE TEXTURE OVERLAY (Optional)
+   ============================================ */
+
+.noise-overlay::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+.dark .noise-overlay::after {
+  opacity: 0.05;
+}
+
+/* ============================================
+   PLOTLY CHART OVERRIDES
+   ============================================ */
+
+.js-plotly-plot .plotly .modebar {
+  display: none !important;
 }

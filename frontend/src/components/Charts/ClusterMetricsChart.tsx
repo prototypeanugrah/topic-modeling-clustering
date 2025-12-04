@@ -1,5 +1,6 @@
 import Plot from "react-plotly.js";
 import type { ClusterMetricsResponse } from "../../types/api";
+import { useTheme } from "../../hooks/useTheme";
 
 interface ClusterMetricsChartProps {
   data: ClusterMetricsResponse | null;
@@ -18,19 +19,32 @@ export function ClusterMetricsChart({
   selectedClusters,
   onSelectClusters,
 }: ClusterMetricsChartProps) {
+  const { isDark } = useTheme();
+
+  // Theme-aware colors
+  const colors = {
+    bg: isDark ? '#21262d' : '#ffffff',
+    text: isDark ? '#e6edf3' : '#1a1a1a',
+    textMuted: isDark ? '#8b949e' : '#6b6b6b',
+    grid: isDark ? '#30363d' : '#e5e5e0',
+    silhouette: '#a855f7',
+    inertia: isDark ? '#6e7681' : '#6b6b6b',
+    success: '#00d4aa',
+    selected: '#ff6b35',
+  };
+
   // Show full skeleton only on initial load (no cached data)
   if (loading && !data) {
     return (
-      <div className="bg-white rounded-xl shadow-lg p-6 h-[480px] flex flex-col">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">
-          Optimal Number of Clusters
-        </h3>
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <div className="relative">
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-purple-200"></div>
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-purple-600 border-t-transparent absolute top-0 left-0"></div>
+      <div className="terminal-panel h-[480px] flex flex-col">
+        <div className="terminal-panel-header">
+          Cluster Metrics
+        </div>
+        <div className="terminal-panel-content flex-1 flex flex-col items-center justify-center">
+          <div className="terminal-loading">Computing metrics</div>
+          <div className="loading-bar w-48 mt-4">
+            <div className="loading-bar-progress"></div>
           </div>
-          <span className="text-gray-500 text-sm mt-4">Computing cluster metrics...</span>
         </div>
       </div>
     );
@@ -38,39 +52,46 @@ export function ClusterMetricsChart({
 
   if (!data) {
     return (
-      <div className="bg-white rounded-xl shadow-lg p-6 h-[480px] flex flex-col">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">
-          Optimal Number of Clusters
-        </h3>
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <svg className="w-12 h-12 text-red-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="terminal-panel h-[480px] flex flex-col">
+        <div className="terminal-panel-header">
+          <span className="status-dot status-dot--error"></span>
+          Cluster Metrics
+        </div>
+        <div className="terminal-panel-content flex-1 flex flex-col items-center justify-center">
+          <svg className="w-12 h-12 mb-3" style={{ color: 'var(--status-error)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
-          <span className="text-red-500 text-sm">Failed to load cluster metrics</span>
+          <span className="font-mono text-sm" style={{ color: 'var(--status-error)' }}>Failed to load cluster metrics</span>
         </div>
       </div>
     );
   }
 
   const selectedIndex = data.cluster_counts.indexOf(selectedClusters);
-
-  // Show subtle indicator during background revalidation
   const showValidatingIndicator = isValidating && data;
 
   return (
-    <div className={`bg-white rounded-xl shadow-lg p-6 h-[480px] flex flex-col relative transition-opacity ${showValidatingIndicator ? 'opacity-80' : ''}`}>
+    <div className={`terminal-panel h-[480px] flex flex-col relative transition-opacity ${showValidatingIndicator ? 'opacity-80' : ''}`}>
       {showValidatingIndicator && (
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-2 text-xs text-gray-400">
-          <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-2 font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
+          <div className="status-dot status-dot--active" style={{ width: 6, height: 6 }} />
           <span>Updating...</span>
         </div>
       )}
-      <h3 className="text-lg font-semibold text-gray-800 mb-4">
-        Optimal Number of Clusters
-        <span className="text-sm font-normal text-gray-500 ml-2">({data.n_topics} topics)</span>
-      </h3>
-      <div className="flex-1 min-h-0">
+      <div className="terminal-panel-header">
+        Optimal Clusters
+        <span className="ml-2 font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
+          {selectedClusters} clusters
+        </span>
+        {data.elbow_point && (
+          <span className="ml-2 px-2 py-0.5 rounded text-xs" style={{ background: 'var(--accent-secondary)', color: 'white' }}>
+            elbow={data.elbow_point}
+          </span>
+        )}
+      </div>
+      <div className="terminal-panel-content flex-1 min-h-0">
         <Plot
+          key={isDark ? 'dark' : 'light'}
           data={[
             // Silhouette score (primary y-axis)
             {
@@ -78,10 +99,11 @@ export function ClusterMetricsChart({
               y: data.silhouette_scores,
               type: "scatter",
               mode: "lines+markers",
-              marker: { color: "#8b5cf6", size: 8 },
-              line: { color: "#8b5cf6", width: 2 },
+              marker: { color: colors.silhouette, size: 8 },
+              line: { color: colors.silhouette, width: 2 },
               name: "Silhouette",
               yaxis: "y",
+              hovertemplate: "<b>Metric:</b> Silhouette<br><b>Clusters:</b> %{x}<br><b>Value:</b> %{y:.6f}<extra></extra>",
             },
             // Inertia (secondary y-axis)
             {
@@ -89,21 +111,23 @@ export function ClusterMetricsChart({
               y: data.inertia_scores,
               type: "scatter",
               mode: "lines+markers",
-              marker: { color: "#64748b", size: 6 },
-              line: { color: "#64748b", width: 1, dash: "dash" },
+              marker: { color: colors.inertia, size: 6 },
+              line: { color: colors.inertia, width: 1, dash: "dash" },
               name: "Inertia",
               yaxis: "y2",
+              hovertemplate: "<b>Metric:</b> Inertia<br><b>Clusters:</b> %{x}<br><b>Value:</b> %{y:.2f}<extra></extra>",
             },
-            // Highlight elbow point on the Inertia line (that's where elbow method applies)
+            // Highlight elbow point on the Inertia line
             data.elbow_point
               ? {
                   x: [data.elbow_point],
                   y: [data.inertia_scores[data.cluster_counts.indexOf(data.elbow_point)]],
                   type: "scatter",
                   mode: "markers",
-                  marker: { color: "#22c55e", size: 14, symbol: "star" },
+                  marker: { color: colors.success, size: 14, symbol: "star" },
                   name: `Elbow (k=${data.elbow_point})`,
                   yaxis: "y2",
+                  hovertemplate: `<b>Elbow Point</b><br><b>Clusters:</b> ${data.elbow_point}<br><b>Inertia:</b> %{y:.2f}<extra></extra>`,
                 }
               : {},
             // Highlight selected point
@@ -114,11 +138,12 @@ export function ClusterMetricsChart({
                   type: "scatter",
                   mode: "markers",
                   marker: {
-                    color: "#f97316",
+                    color: colors.selected,
                     size: 12,
-                    line: { color: "#fff", width: 2 },
+                    line: { color: colors.bg, width: 2 },
                   },
                   name: `Selected (k=${selectedClusters})`,
+                  hovertemplate: `<b>Selected</b><br><b>Clusters:</b> ${selectedClusters}<br><b>Silhouette:</b> %{y:.6f}<extra></extra>`,
                 }
               : {},
           ]}
@@ -126,24 +151,41 @@ export function ClusterMetricsChart({
             autosize: true,
             height: CHART_HEIGHT,
             margin: { l: 60, r: 60, t: 30, b: 70 },
+            paper_bgcolor: colors.bg,
+            plot_bgcolor: colors.bg,
+            font: {
+              family: "'JetBrains Mono', 'SF Mono', monospace",
+              color: colors.text,
+              size: 11,
+            },
             xaxis: {
-              title: { text: "Number of Clusters" },
+              title: { text: "Number of Clusters", font: { size: 11 } },
               dtick: 1,
+              gridcolor: colors.grid,
+              linecolor: colors.grid,
+              tickfont: { size: 10 },
             },
             yaxis: {
-              title: { text: "Silhouette Score" },
+              title: { text: "Silhouette Score", font: { size: 11 } },
               side: "left",
+              gridcolor: colors.grid,
+              linecolor: colors.grid,
+              tickfont: { size: 10 },
             },
             yaxis2: {
-              title: { text: "Inertia" },
+              title: { text: "Inertia", font: { size: 11 } },
               side: "right",
               overlaying: "y",
+              gridcolor: colors.grid,
+              linecolor: colors.grid,
+              tickfont: { size: 10 },
             },
             showlegend: true,
             legend: {
               x: 0,
               y: 1.15,
               orientation: "h",
+              font: { size: 10 },
             },
           }}
           config={{ displayModeBar: false }}

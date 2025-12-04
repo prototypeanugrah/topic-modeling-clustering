@@ -8,6 +8,8 @@ from backend.cache.manager import (
     load_doc_topic_distribution,
     load_document_labels,
     load_lda_model,
+    load_cluster_labels,
+    load_document_enrichment,
 )
 from backend.core.clustering import perform_kmeans
 from backend.models.requests import VisualizationRequest
@@ -22,13 +24,12 @@ router = APIRouter(prefix="/visualization", tags=["visualization"])
 
 
 @router.get("/{n_topics}", response_model=VisualizationResponse)
-async def get_visualization(n_topics: int, dataset: str = "train"):
+async def get_visualization(n_topics: int):
     """
     Get UMAP 2D projections for visualization.
 
     Args:
         n_topics: Number of topics
-        dataset: Which dataset to visualize (train or test)
 
     Returns pre-computed UMAP coordinates for all documents.
     """
@@ -38,18 +39,12 @@ async def get_visualization(n_topics: int, dataset: str = "train"):
             detail=f"n_topics must be between {MIN_TOPICS} and {MAX_TOPICS}"
         )
 
-    if dataset not in ["train", "test"]:
-        raise HTTPException(
-            status_code=400,
-            detail="dataset must be 'train' or 'test'"
-        )
-
-    projection = load_umap_projection(n_topics, dataset)
+    projection = load_umap_projection(n_topics)
 
     if projection is None:
         raise HTTPException(
             status_code=503,
-            detail=f"UMAP projection for {n_topics} topics ({dataset}) not available. Run precomputation first."
+            detail=f"UMAP projection for {n_topics} topics not available. Run precomputation first."
         )
 
     # Round to 4 decimal places to reduce payload size (~30% smaller)
@@ -59,7 +54,6 @@ async def get_visualization(n_topics: int, dataset: str = "train"):
         n_topics=n_topics,
         projections=rounded_projections,
         document_ids=list(range(len(projection))),
-        dataset=dataset,
     )
 
 
@@ -68,73 +62,84 @@ async def get_clustered_visualization(request: VisualizationRequest):
     """
     Get UMAP projections with cluster labels, newsgroup labels, and topic info.
 
-    Combines pre-computed UMAP projections with real-time K-Means clustering.
-    Includes original newsgroup labels and top topics for tooltip enrichment.
+    Uses precomputed data when available for fast response times.
     """
-    dataset = request.dataset
-
-    projection = load_umap_projection(request.n_topics, dataset)
-    distribution = load_doc_topic_distribution(request.n_topics, dataset)
+    projection = load_umap_projection(request.n_topics)
 
     if projection is None:
         raise HTTPException(
             status_code=503,
-            detail=f"UMAP projection for {request.n_topics} topics ({dataset}) not available. Run precomputation first."
+            detail=f"UMAP projection for {request.n_topics} topics not available. Run precomputation first."
         )
 
-    if distribution is None:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Distribution for {request.n_topics} topics ({dataset}) not available. Run precomputation first."
-        )
-
-    # Perform clustering
-    result = perform_kmeans(distribution, request.n_clusters)
+    # Try precomputed cluster labels first
+    cluster_labels = load_cluster_labels(request.n_topics, request.n_clusters)
+    if cluster_labels is None:
+        # Fallback to runtime computation
+        distribution = load_doc_topic_distribution(request.n_topics)
+        if distribution is None:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Distribution for {request.n_topics} topics not available. Run precomputation first."
+            )
+        result = perform_kmeans(distribution, request.n_clusters)
+        cluster_labels = result.labels
 
     # Round to 4 decimal places to reduce payload size (~30% smaller)
     rounded_projections = [[round(x, 4), round(y, 4)] for x, y in projection.tolist()]
 
     # Load newsgroup labels (optional - may not be cached)
-    newsgroup_labels = load_document_labels(dataset)
+    newsgroup_labels = load_document_labels()
 
-    # Compute top 3 topics for each document
-    top_topics = None
-    dominant_topic_words = None
-
-    model = load_lda_model(request.n_topics)
-    if model is not None:
-        # Get top 3 topics for each document (sorted by probability descending)
-        top_3_indices = np.argsort(distribution, axis=1)[:, -3:][:, ::-1]
-        top_topics = []
-        for i, doc_dist in enumerate(distribution):
-            doc_top_topics = [
-                DocumentTopicInfo(
-                    topic_id=int(idx),
-                    probability=round(float(doc_dist[idx]), 4)
-                )
-                for idx in top_3_indices[i]
-            ]
-            top_topics.append(doc_top_topics)
-
-        # Get top 5 words for each topic (cache to avoid repeated calls)
-        topic_word_cache: dict[int, list[str]] = {}
-        for topic_id in range(request.n_topics):
-            words = model.show_topic(topic_id, topn=5)
-            topic_word_cache[topic_id] = [word for word, _ in words]
-
-        # Map each document to its dominant topic's words
-        dominant_topics = np.argmax(distribution, axis=1)
-        dominant_topic_words = [
-            topic_word_cache[int(topic_id)] for topic_id in dominant_topics
+    # Try precomputed document enrichment first
+    enrichment = load_document_enrichment(request.n_topics)
+    if enrichment is not None:
+        top_topics = [
+            [DocumentTopicInfo(topic_id=t["topic_id"], probability=t["probability"])
+             for t in doc_topics]
+            for doc_topics in enrichment["top_topics"]
         ]
+        dominant_topic_words = enrichment["dominant_topic_words"]
+    else:
+        # Fallback to runtime computation
+        top_topics = None
+        dominant_topic_words = None
+
+        distribution = load_doc_topic_distribution(request.n_topics)
+        model = load_lda_model(request.n_topics)
+
+        if model is not None and distribution is not None:
+            # Get top 3 topics for each document (sorted by probability descending)
+            top_3_indices = np.argsort(distribution, axis=1)[:, -3:][:, ::-1]
+            top_topics = []
+            for i, doc_dist in enumerate(distribution):
+                doc_top_topics = [
+                    DocumentTopicInfo(
+                        topic_id=int(idx),
+                        probability=round(float(doc_dist[idx]), 4)
+                    )
+                    for idx in top_3_indices[i]
+                ]
+                top_topics.append(doc_top_topics)
+
+            # Get top 5 words for each topic (cache to avoid repeated calls)
+            topic_word_cache: dict[int, list[str]] = {}
+            for topic_id in range(request.n_topics):
+                words = model.show_topic(topic_id, topn=5)
+                topic_word_cache[topic_id] = [word for word, _ in words]
+
+            # Map each document to its dominant topic's words
+            dominant_topics = np.argmax(distribution, axis=1)
+            dominant_topic_words = [
+                topic_word_cache[int(topic_id)] for topic_id in dominant_topics
+            ]
 
     return ClusteredVisualizationResponse(
         n_topics=request.n_topics,
         n_clusters=request.n_clusters,
         projections=rounded_projections,
-        cluster_labels=result.labels.tolist(),
+        cluster_labels=cluster_labels.tolist() if hasattr(cluster_labels, 'tolist') else list(cluster_labels),
         document_ids=list(range(len(projection))),
-        dataset=dataset,
         newsgroup_labels=newsgroup_labels,
         top_topics=top_topics,
         dominant_topic_words=dominant_topic_words,

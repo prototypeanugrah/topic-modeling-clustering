@@ -13,29 +13,65 @@ export function TopicSlider({
   max = 20,
   optimalValue,
 }: TopicSliderProps) {
+  const decrement = () => {
+    if (value > min) onChange(value - 1);
+  };
+
+  const increment = () => {
+    if (value < max) onChange(value + 1);
+  };
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex justify-between items-center">
-        <label className="text-sm font-medium text-gray-700">
-          Number of Topics
+        <label className="data-label">
+          Topics
         </label>
-        <span className="text-sm font-bold text-blue-600">{value}</span>
+        <span
+          className="data-value text-lg"
+          style={{ color: 'var(--accent-primary)' }}
+        >
+          {value}
+        </span>
       </div>
 
-      <input
-        type="range"
-        min={min}
-        max={max}
-        value={value}
-        onChange={(e) => onChange(parseInt(e.target.value))}
-        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-      />
+      <div className="flex items-center gap-2">
+        <button
+          onClick={decrement}
+          disabled={value <= min}
+          className="btn-circle"
+          aria-label="Decrease topics"
+        >
+          &lt;
+        </button>
 
-      <div className="flex justify-between text-xs text-gray-500">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(e) => onChange(parseInt(e.target.value))}
+          className="flex-1 cursor-pointer"
+        />
+
+        <button
+          onClick={increment}
+          disabled={value >= max}
+          className="btn-circle"
+          aria-label="Increase topics"
+        >
+          &gt;
+        </button>
+      </div>
+
+      <div className="flex justify-between items-center font-mono text-xs" style={{ color: 'var(--text-secondary)' }}>
         <span>{min}</span>
         {optimalValue && (
-          <span className="text-green-600 font-medium">
-            Optimal: {optimalValue}
+          <span
+            className="px-2 py-0.5 rounded"
+            style={{ background: 'var(--accent-secondary)', color: 'white' }}
+          >
+            optimal: {optimalValue}
           </span>
         )}
         <span>{max}</span>

@@ -1,77 +1,58 @@
 import Plot from "react-plotly.js";
 import type { ClusteredVisualizationResponse, DocumentTopicInfo } from "../../types/api";
+import { useTheme } from "../../hooks/useTheme";
 
 interface ScatterPlotProps {
   data: ClusteredVisualizationResponse | null;
   loading: boolean;
   isValidating?: boolean;
-  dataset: "train" | "test";
-  onDatasetChange: (dataset: "train" | "test") => void;
 }
 
-// Color palette for clusters
+// Industrial color palette for clusters
 const CLUSTER_COLORS = [
-  "#3b82f6", // blue
-  "#ef4444", // red
-  "#22c55e", // green
-  "#f59e0b", // amber
-  "#8b5cf6", // violet
-  "#ec4899", // pink
+  "#58a6ff", // blue
+  "#f85149", // red
+  "#00d4aa", // teal/green
+  "#d29922", // amber
+  "#a855f7", // purple
+  "#ff6b35", // orange
   "#06b6d4", // cyan
   "#84cc16", // lime
-  "#f97316", // orange
+  "#ec4899", // pink
   "#6366f1", // indigo
   "#14b8a6", // teal
-  "#a855f7", // purple
-  "#eab308", // yellow
+  "#f59e0b", // yellow
+  "#8b5cf6", // violet
   "#64748b", // slate
   "#78716c", // stone
 ];
 
-export function ScatterPlot({ data, loading, isValidating, dataset, onDatasetChange }: ScatterPlotProps) {
-  // Dataset toggle component
-  const DatasetToggle = () => (
-    <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-      <button
-        onClick={() => onDatasetChange("train")}
-        className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-          dataset === "train"
-            ? "bg-white text-gray-800 shadow-sm"
-            : "text-gray-500 hover:text-gray-700"
-        }`}
-      >
-        Train
-      </button>
-      <button
-        onClick={() => onDatasetChange("test")}
-        className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-          dataset === "test"
-            ? "bg-white text-gray-800 shadow-sm"
-            : "text-gray-500 hover:text-gray-700"
-        }`}
-      >
-        Test
-      </button>
-    </div>
-  );
+export function ScatterPlot({ data, loading, isValidating }: ScatterPlotProps) {
+  const { isDark } = useTheme();
+
+  // Theme-aware colors
+  const colors = {
+    bg: isDark ? '#21262d' : '#ffffff',
+    text: isDark ? '#e6edf3' : '#1a1a1a',
+    textMuted: isDark ? '#8b949e' : '#6b6b6b',
+    grid: isDark ? '#30363d' : '#e5e5e0',
+  };
 
   // Show full skeleton only on initial load (no cached data)
   if (loading && !data) {
     return (
-      <div className="bg-white rounded-xl shadow-lg p-6 h-[550px] flex flex-col">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">
-            Document Clusters
-          </h3>
-          <DatasetToggle />
+      <div className="terminal-panel h-[550px] flex flex-col">
+        <div className="terminal-panel-header">
+          Document Clusters
         </div>
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <div className="relative">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-pink-200"></div>
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-pink-600 border-t-transparent absolute top-0 left-0"></div>
+        <div className="terminal-panel-content flex-1 flex flex-col items-center justify-center">
+          <div className="terminal-loading">Rendering visualization</div>
+          <div className="loading-bar w-64 mt-4">
+            <div className="loading-bar-progress"></div>
           </div>
-          <span className="text-gray-500 text-sm mt-4">Rendering visualization...</span>
-          <span className="text-gray-400 text-xs mt-1">Processing documents...</span>
+          <span className="font-mono text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
+            Processing documents...
+          </span>
         </div>
       </div>
     );
@@ -79,18 +60,16 @@ export function ScatterPlot({ data, loading, isValidating, dataset, onDatasetCha
 
   if (!data) {
     return (
-      <div className="bg-white rounded-xl shadow-lg p-6 h-[550px] flex flex-col">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">
-            Document Clusters
-          </h3>
-          <DatasetToggle />
+      <div className="terminal-panel h-[550px] flex flex-col">
+        <div className="terminal-panel-header">
+          <span className="status-dot status-dot--error"></span>
+          Document Clusters
         </div>
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <svg className="w-12 h-12 text-red-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="terminal-panel-content flex-1 flex flex-col items-center justify-center">
+          <svg className="w-12 h-12 mb-3" style={{ color: 'var(--status-error)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
-          <span className="text-red-500 text-sm">Failed to load visualization</span>
+          <span className="font-mono text-sm" style={{ color: 'var(--status-error)' }}>Failed to load visualization</span>
         </div>
       </div>
     );
@@ -157,13 +136,15 @@ export function ScatterPlot({ data, loading, isValidating, dataset, onDatasetCha
       return text;
     });
 
+    const clusterColor = CLUSTER_COLORS[parseInt(cluster) % CLUSTER_COLORS.length];
+
     return {
       x: points.x,
       y: points.y,
       type: "scatter" as const,
       mode: "markers" as const,
       marker: {
-        color: CLUSTER_COLORS[parseInt(cluster) % CLUSTER_COLORS.length],
+        color: clusterColor,
         size: 5,
         opacity: 0.7,
       },
@@ -171,9 +152,9 @@ export function ScatterPlot({ data, loading, isValidating, dataset, onDatasetCha
       text: hoverText,
       hoverinfo: "text" as const,
       hoverlabel: {
-        bgcolor: "white",
-        bordercolor: CLUSTER_COLORS[parseInt(cluster) % CLUSTER_COLORS.length],
-        font: { size: 11 },
+        bgcolor: colors.bg,
+        bordercolor: clusterColor,
+        font: { size: 11, family: "'JetBrains Mono', monospace", color: colors.text },
       },
     };
   });
@@ -181,54 +162,63 @@ export function ScatterPlot({ data, loading, isValidating, dataset, onDatasetCha
   // Show subtle indicator during background revalidation
   const showValidatingIndicator = isValidating && data;
 
-  // Document count based on dataset
-  const docCount = data.projections.length.toLocaleString();
-
   return (
-    <div className={`bg-white rounded-xl shadow-lg p-6 relative transition-opacity ${showValidatingIndicator ? 'opacity-80' : ''}`}>
+    <div className={`terminal-panel relative transition-opacity ${showValidatingIndicator ? 'opacity-80' : ''}`}>
       {showValidatingIndicator && (
-        <div className="absolute top-16 right-4 z-10 flex items-center gap-2 text-xs text-gray-400">
-          <div className="w-2 h-2 bg-pink-400 rounded-full animate-pulse" />
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-2 font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
+          <div className="status-dot status-dot--active" style={{ width: 6, height: 6 }} />
           <span>Updating...</span>
         </div>
       )}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">
-          Document Clusters
-          <span className="text-sm font-normal text-gray-500 ml-2">
-            ({data.n_topics} topics, {data.n_clusters} clusters, {docCount} docs)
-          </span>
-        </h3>
-        <DatasetToggle />
+      <div className="terminal-panel-header">
+        Document Clusters
       </div>
-      <Plot
-        data={traces}
-        layout={{
-          autosize: true,
-          height: 500,
-          margin: { l: 50, r: 30, t: 10, b: 50 },
-          xaxis: {
-            title: { text: "UMAP Dimension 1" },
-            zeroline: false,
-          },
-          yaxis: {
-            title: { text: "UMAP Dimension 2" },
-            zeroline: false,
-          },
-          showlegend: true,
-          legend: {
-            x: 1,
-            y: 1,
-            xanchor: "right",
-          },
-          hovermode: "closest",
-        }}
-        config={{
-          displayModeBar: true,
-          modeBarButtonsToRemove: ["lasso2d", "select2d"],
-        }}
-        style={{ width: "100%" }}
-      />
+      <div className="terminal-panel-content">
+        <Plot
+          key={isDark ? 'dark' : 'light'}
+          data={traces}
+          layout={{
+            autosize: true,
+            height: 500,
+            margin: { l: 50, r: 30, t: 10, b: 50 },
+            paper_bgcolor: colors.bg,
+            plot_bgcolor: colors.bg,
+            font: {
+              family: "'JetBrains Mono', 'SF Mono', monospace",
+              color: colors.text,
+              size: 11,
+            },
+            xaxis: {
+              title: { text: "UMAP Dimension 1", font: { size: 11 } },
+              zeroline: false,
+              gridcolor: colors.grid,
+              linecolor: colors.grid,
+              tickfont: { size: 10 },
+            },
+            yaxis: {
+              title: { text: "UMAP Dimension 2", font: { size: 11 } },
+              zeroline: false,
+              gridcolor: colors.grid,
+              linecolor: colors.grid,
+              tickfont: { size: 10 },
+            },
+            showlegend: true,
+            legend: {
+              x: 1,
+              y: 1,
+              xanchor: "right",
+              font: { size: 10 },
+              bgcolor: 'rgba(0,0,0,0)',
+            },
+            hovermode: "closest",
+          }}
+          config={{
+            displayModeBar: true,
+            modeBarButtonsToRemove: ["lasso2d", "select2d"],
+          }}
+          style={{ width: "100%" }}
+        />
+      </div>
     </div>
   );
 }

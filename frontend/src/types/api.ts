@@ -8,26 +8,18 @@ export interface HealthResponse {
 export interface StatusResponse {
   complete: boolean;
   dictionary: boolean;
-  corpus_train: boolean;
-  corpus_test: boolean;
-  tokenized_train: boolean;
-  tokenized_test: boolean;
-  coherence_val: boolean;
-  coherence_test: boolean;
+  corpus: boolean;
+  tokenized: boolean;
+  coherence: boolean;
   models: Record<number, boolean>;
-  distributions_train: Record<number, boolean>;
-  distributions_test: Record<number, boolean>;
-  projections_train: Record<number, boolean>;
-  projections_test: Record<number, boolean>;
+  distributions: Record<number, boolean>;
+  projections: Record<number, boolean>;
 }
 
 export interface CoherenceResponse {
   topic_counts: number[];
-  // Validation scores (averaged from 5-fold CV)
-  coherence_val: number[];
-  // Test scores (final evaluation on held-out set)
-  coherence_test: number[];
-  optimal_topics: number; // Based on test coherence
+  coherence: number[];
+  optimal_topics: number;
 }
 
 export interface TopicWord {
@@ -43,7 +35,6 @@ export interface TopicWordsResponse {
 export interface ClusteringRequest {
   n_topics: number;
   n_clusters: number;
-  dataset?: "train" | "test";
 }
 
 export interface ClusteringResponse {
@@ -67,7 +58,6 @@ export interface VisualizationResponse {
   n_topics: number;
   projections: number[][];
   document_ids: number[];
-  dataset: "train" | "test";
 }
 
 export interface DocumentTopicInfo {
@@ -81,7 +71,6 @@ export interface ClusteredVisualizationResponse {
   projections: number[][];
   cluster_labels: number[];
   document_ids: number[];
-  dataset: "train" | "test";
 
   // Optional tooltip enrichment fields
   newsgroup_labels?: string[]; // Original 20 newsgroups labels
@@ -121,28 +110,31 @@ export interface StageStats {
 
 export interface EDAResponse {
   // Stage 1: Raw documents (token counts via whitespace split)
-  raw_train: StageStats;
-  raw_test: StageStats;
+  raw: StageStats;
 
   // Stage 2: Tokenized (after preprocessing, before filter_extremes)
   vocab_before_filter: number;
-  tokenized_train: StageStats;
-  tokenized_test: StageStats;
+  tokenized: StageStats;
 
   // Stage 3: After filter_extremes
   vocab_after_filter: number;
-  filtered_train: StageStats;
-  filtered_test: StageStats;
+  filtered: StageStats;
   vocab_reduction_pct: number;
 
   // Stage 4: After document filtering (final corpus)
-  final_train: StageStats;
-  final_test: StageStats;
+  final: StageStats;
   min_tokens_threshold: number;
-  train_docs_removed: number;
-  test_docs_removed: number;
+  docs_removed: number;
 
   // Filter settings used
   filter_no_below: number;
   filter_no_above: number;
+}
+
+export interface BoxPlotData {
+  // Token counts by preprocessing stage (raw arrays for Plotly box plots)
+  stage_token_counts: Record<string, number[]>;
+
+  // Token counts by newsgroup category
+  category_token_counts: Record<string, number[]>;
 }
