@@ -19,9 +19,9 @@ const swrConfig = {
 /**
  * Hook for fetching GMM metrics for a specific covariance type.
  */
-export function useGMMMetrics(nTopics: number, covarianceType: CovarianceType) {
+export function useGMMMetrics(nTopics: number | null, covarianceType: CovarianceType) {
   const { data, error, isLoading, isValidating } = useSWR<GMMMetricsResponse>(
-    `/gmm/metrics/${nTopics}?covariance_type=${covarianceType}`,
+    nTopics !== null ? `/gmm/metrics/${nTopics}?covariance_type=${covarianceType}` : null,
     swrFetcher,
     swrConfig
   );
@@ -30,11 +30,13 @@ export function useGMMMetrics(nTopics: number, covarianceType: CovarianceType) {
   useEffect(() => {
     const timer = setTimeout(() => {
       const covTypes: CovarianceType[] = ["full", "diag", "spherical"];
-      covTypes
-        .filter((ct) => ct !== covarianceType)
-        .forEach((ct) => {
-          prefetch(`/gmm/metrics/${nTopics}?covariance_type=${ct}`);
-        });
+      if (nTopics !== null) {
+        covTypes
+          .filter((ct) => ct !== covarianceType)
+          .forEach((ct) => {
+            prefetch(`/gmm/metrics/${nTopics}?covariance_type=${ct}`);
+          });
+      }
     }, 200);
 
     return () => clearTimeout(timer);
@@ -85,22 +87,23 @@ export function useGMMAllMetrics(nTopics: number) {
  * Hook for fetching GMM clustered visualization data.
  */
 export function useGMMClusteredVisualization(
-  nTopics: number,
+  nTopics: number | null,
   nClusters: number,
   covarianceType: CovarianceType
 ) {
   const { data, error, isLoading, isValidating } =
     useSWR<GMMClusteredVisualizationResponse>(
-      [
-        "/visualization/gmm-clustered",
-        { n_topics: nTopics, n_clusters: nClusters, covariance_type: covarianceType },
-      ],
+      nTopics !== null
+        ? ["/visualization/gmm-clustered", { n_topics: nTopics, n_clusters: nClusters, covariance_type: covarianceType }]
+        : null,
       swrPostFetcher,
       swrConfig
     );
 
   // Prefetch adjacent cluster counts
   useEffect(() => {
+    if (nTopics === null) return;
+
     const timer = setTimeout(() => {
       // Prefetch adjacent cluster counts
       if (nClusters > 2) {

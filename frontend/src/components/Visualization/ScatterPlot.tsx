@@ -96,7 +96,7 @@ function generateEllipsePath(
   return pathParts.join(" ") + " Z";
 }
 
-export function ScatterPlot({ data, loading, isValidating, algorithm = "kmeans" }: ScatterPlotProps) {
+export function ScatterPlot({ data, loading, isValidating, algorithm: _algorithm = "kmeans" }: ScatterPlotProps) {
   const { isDark } = useTheme();
 
   // Theme-aware colors

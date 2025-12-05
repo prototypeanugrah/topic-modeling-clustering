@@ -14,7 +14,8 @@ import { useCoherence, useTopicWords, useClusterMetrics } from "../hooks/useTopi
 import { useClusteredVisualization } from "../hooks/useClusterData";
 import { useEDA, useBoxPlotData } from "../hooks/useEDA";
 import { api } from "../api/client";
-import type { HealthResponse, Algorithm, CovarianceType } from "../types/api";
+import type { HealthResponse, CovarianceType } from "../types/api";
+import type { Algorithm } from "./ControlPanel";
 import { useGMMMetrics, useGMMClusteredVisualization } from "../hooks/useGMMData";
 import { GMMMetricsChart } from "./Charts/GMMMetricsChart";
 
@@ -194,9 +195,9 @@ export function Dashboard() {
               onTopicsChange={setNTopics}
               onClustersChange={setNClusters}
               optimalTopics={coherenceData?.optimal_topics}
-              optimalClusters={algorithm === "kmeans"
+              optimalClusters={(algorithm === "kmeans"
                 ? clusterMetricsData?.elbow_point
-                : gmmMetricsData?.optimal_bic}
+                : gmmMetricsData?.optimal_bic) ?? undefined}
               minTopics={minTopics}
               maxTopics={maxTopics}
               minClusters={minClusters}
@@ -244,9 +245,9 @@ export function Dashboard() {
                 onTopicsChange={setNTopics}
                 onClustersChange={setNClusters}
                 optimalTopics={coherenceData?.optimal_topics}
-                optimalClusters={algorithm === "kmeans"
+                optimalClusters={(algorithm === "kmeans"
                   ? clusterMetricsData?.elbow_point
-                  : gmmMetricsData?.optimal_bic}
+                  : gmmMetricsData?.optimal_bic) ?? undefined}
                 minTopics={minTopics}
                 maxTopics={maxTopics}
                 minClusters={minClusters}
