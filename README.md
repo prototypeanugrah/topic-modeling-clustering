@@ -1,6 +1,6 @@
 # Topic Modeling & Clustering Dashboard
 
-An interactive web dashboard for exploring topic distributions and document clusters in the 20 Newsgroups dataset using LDA topic modeling and K-Means clustering.
+An interactive web dashboard for exploring topic distributions and document clusters in the 20 Newsgroups dataset using LDA topic modeling and K-Means/GMM clustering.
 
 ![Python](https://img.shields.io/badge/Python-3.12+-blue?logo=python)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.122+-green?logo=fastapi)
@@ -14,7 +14,7 @@ An interactive web dashboard for exploring topic distributions and document clus
 1. **Data Preprocessing**: Loads the 20 Newsgroups dataset and applies text preprocessing (tokenization, lemmatization, stopword removal) using spaCy
 2. **Topic Modeling**: Trains LDA (Latent Dirichlet Allocation) models using Gensim for topic counts ranging from 2-20
 3. **Dimensionality Reduction**: Applies UMAP to project high-dimensional document-topic distributions to 2D for visualization
-4. **Clustering**: Performs K-Means clustering on document-topic distributions
+4. **Clustering**: Performs K-Means and GMM clustering on document-topic distributions
 5. **Interactive Dashboard**: Provides a React-based UI to explore topics, clusters, and quality metrics in real-time
 
 ---
@@ -23,6 +23,7 @@ An interactive web dashboard for exploring topic distributions and document clus
 
 - **LDA Topic Modeling** with coherence scores
 - **K-Means Clustering** with silhouette scores and elbow detection
+- **Gaussian Mixture Models (GMM) Clustering** with AIC/BIC scores
 
 - **Interactive Charts**: Coherence plot, silhouette/inertia plot, token distribution box plots
 - **UMAP Scatter Plot**: 2D visualization of clustered documents
