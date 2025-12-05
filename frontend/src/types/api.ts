@@ -72,6 +72,10 @@ export interface ClusteredVisualizationResponse {
   cluster_labels: number[];
   document_ids: number[];
 
+  // Cluster geometry for boundary visualization
+  cluster_centers?: number[][]; // [[x, y], ...] per cluster
+  cluster_covariances?: number[][][]; // [[[a,b],[c,d]], ...] 2x2 per cluster
+
   // Optional tooltip enrichment fields
   newsgroup_labels?: string[]; // Original 20 newsgroups labels
   top_topics?: DocumentTopicInfo[][]; // Top 3 topics per document
@@ -137,4 +141,66 @@ export interface BoxPlotData {
 
   // Token counts by newsgroup category
   category_token_counts: Record<string, number[]>;
+}
+
+// === GMM Types ===
+
+export type CovarianceType = "full" | "diag" | "spherical";
+
+export interface GMMRequest {
+  n_topics: number;
+  n_clusters: number;
+  covariance_type: CovarianceType;
+}
+
+export interface ClusterProbability {
+  cluster_id: number;
+  probability: number;
+}
+
+export interface GMMResponse {
+  n_topics: number;
+  n_clusters: number;
+  covariance_type: string;
+  labels: number[];
+  probabilities: ClusterProbability[][];
+  bic: number;
+  aic: number;
+  cluster_sizes: number[];
+}
+
+export interface GMMMetricsResponse {
+  n_topics: number;
+  covariance_type: string;
+  cluster_counts: number[];
+  bic_scores: number[];
+  aic_scores: number[];
+  optimal_bic: number;
+  optimal_aic: number;
+}
+
+export interface GMMAllCovarianceMetricsResponse {
+  n_topics: number;
+  full: GMMMetricsResponse;
+  diag: GMMMetricsResponse;
+  spherical: GMMMetricsResponse;
+}
+
+export interface GMMClusteredVisualizationResponse {
+  n_topics: number;
+  n_clusters: number;
+  covariance_type: string;
+  projections: number[][];
+  cluster_labels: number[];
+  cluster_probabilities: ClusterProbability[][];
+  document_ids: number[];
+
+  // Cluster geometry for ellipse visualization (in UMAP 2D space)
+  cluster_means?: number[][]; // [[x, y], ...] per cluster
+  cluster_covariances?: number[][][]; // [[[a,b],[c,d]], ...] 2x2 per cluster
+
+  // Optional tooltip enrichment fields
+  newsgroup_labels?: string[];
+  top_topics?: DocumentTopicInfo[][];
+  dominant_topic_words?: string[][];
 }

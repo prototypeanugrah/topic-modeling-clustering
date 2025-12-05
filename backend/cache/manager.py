@@ -464,3 +464,125 @@ def load_document_enrichment(num_topics: int) -> dict | None:
         with open(path, "r") as f:
             return json.load(f)
     return None
+
+
+# === GMM Metrics Cache ===
+
+
+def save_gmm_metrics(metrics: dict, num_topics: int, cov_type: str) -> Path:
+    """Save precomputed GMM metrics to cache.
+
+    Args:
+        metrics: Dictionary with GMM metrics (silhouette, bic, aic, etc.)
+        num_topics: Number of topics
+        cov_type: Covariance type ('full', 'diag', 'spherical')
+
+    Returns:
+        Path to saved file
+    """
+    ensure_cache_dirs()
+    path = METRICS_DIR / f"gmm_metrics_k{num_topics}_cov_{cov_type}.json"
+    with open(path, "w") as f:
+        json.dump(metrics, f)
+    return path
+
+
+def load_gmm_metrics(num_topics: int, cov_type: str) -> dict | None:
+    """Load precomputed GMM metrics from cache.
+
+    Args:
+        num_topics: Number of topics
+        cov_type: Covariance type ('full', 'diag', 'spherical')
+
+    Returns:
+        Dictionary with GMM metrics, or None if not cached
+    """
+    path = METRICS_DIR / f"gmm_metrics_k{num_topics}_cov_{cov_type}.json"
+    if path.exists():
+        with open(path, "r") as f:
+            return json.load(f)
+    return None
+
+
+# === GMM Labels Cache ===
+
+
+def save_gmm_labels(
+    labels: np.ndarray, num_topics: int, num_clusters: int, cov_type: str
+) -> Path:
+    """Save precomputed GMM cluster labels to cache.
+
+    Args:
+        labels: Cluster label array for each document
+        num_topics: Number of topics
+        num_clusters: Number of clusters
+        cov_type: Covariance type ('full', 'diag', 'spherical')
+
+    Returns:
+        Path to saved file
+    """
+    ensure_cache_dirs()
+    path = CLUSTERS_DIR / f"gmm_labels_k{num_topics}_c{num_clusters}_cov_{cov_type}.npy"
+    np.save(path, labels)
+    return path
+
+
+def load_gmm_labels(
+    num_topics: int, num_clusters: int, cov_type: str
+) -> np.ndarray | None:
+    """Load precomputed GMM cluster labels from cache.
+
+    Args:
+        num_topics: Number of topics
+        num_clusters: Number of clusters
+        cov_type: Covariance type ('full', 'diag', 'spherical')
+
+    Returns:
+        NumPy array of cluster labels, or None if not cached
+    """
+    path = CLUSTERS_DIR / f"gmm_labels_k{num_topics}_c{num_clusters}_cov_{cov_type}.npy"
+    if path.exists():
+        return np.load(path)
+    return None
+
+
+# === GMM Probabilities Cache ===
+
+
+def save_gmm_probabilities(
+    probs: np.ndarray, num_topics: int, num_clusters: int, cov_type: str
+) -> Path:
+    """Save precomputed GMM cluster probabilities (soft assignments) to cache.
+
+    Args:
+        probs: Probability matrix of shape (n_samples, n_clusters)
+        num_topics: Number of topics
+        num_clusters: Number of clusters
+        cov_type: Covariance type ('full', 'diag', 'spherical')
+
+    Returns:
+        Path to saved file
+    """
+    ensure_cache_dirs()
+    path = CLUSTERS_DIR / f"gmm_probs_k{num_topics}_c{num_clusters}_cov_{cov_type}.npy"
+    np.save(path, probs)
+    return path
+
+
+def load_gmm_probabilities(
+    num_topics: int, num_clusters: int, cov_type: str
+) -> np.ndarray | None:
+    """Load precomputed GMM cluster probabilities from cache.
+
+    Args:
+        num_topics: Number of topics
+        num_clusters: Number of clusters
+        cov_type: Covariance type ('full', 'diag', 'spherical')
+
+    Returns:
+        NumPy array of probabilities (n_samples, n_clusters), or None if not cached
+    """
+    path = CLUSTERS_DIR / f"gmm_probs_k{num_topics}_c{num_clusters}_cov_{cov_type}.npy"
+    if path.exists():
+        return np.load(path)
+    return None

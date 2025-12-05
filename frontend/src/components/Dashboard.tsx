@@ -14,7 +14,10 @@ import { useCoherence, useTopicWords, useClusterMetrics } from "../hooks/useTopi
 import { useClusteredVisualization } from "../hooks/useClusterData";
 import { useEDA, useBoxPlotData } from "../hooks/useEDA";
 import { api } from "../api/client";
-import type { HealthResponse } from "../types/api";
+import type { HealthResponse, CovarianceType } from "../types/api";
+import type { Algorithm } from "./ControlPanel";
+import { useGMMMetrics, useGMMClusteredVisualization } from "../hooks/useGMMData";
+import { GMMMetricsChart } from "./Charts/GMMMetricsChart";
 
 export function Dashboard() {
   // State - start with minimum values
@@ -23,6 +26,8 @@ export function Dashboard() {
   const [_health, setHealth] = useState<HealthResponse | null>(null);
   const [_healthLoading, setHealthLoading] = useState(true);
   const [healthError, setHealthError] = useState<string | null>(null);
+  const [algorithm, setAlgorithm] = useState<Algorithm>("kmeans");
+  const [covarianceType, setCovarianceType] = useState<CovarianceType>("full");
 
   // Debounce slider values - reduced delay for snappier feel
   const debouncedTopics = useDebounce(nTopics, 150);
@@ -39,6 +44,17 @@ export function Dashboard() {
   );
   const { data: edaData, loading: edaLoading, isValidating: edaValidating } = useEDA();
   const { data: boxPlotData, loading: boxPlotLoading, isValidating: boxPlotValidating } = useBoxPlotData();
+
+  // GMM data hooks - only fetch when GMM algorithm is selected
+  const { data: gmmMetricsData, loading: gmmMetricsLoading, isValidating: gmmMetricsValidating } = useGMMMetrics(
+    algorithm === "gmm" ? debouncedTopics : null,
+    covarianceType
+  );
+  const { data: gmmVisualizationData, loading: gmmVisualizationLoading, isValidating: gmmVisualizationValidating } = useGMMClusteredVisualization(
+    algorithm === "gmm" ? debouncedTopics : null,
+    debouncedClusters,
+    covarianceType
+  );
 
   // Check health on mount
   useEffect(() => {
@@ -179,11 +195,17 @@ export function Dashboard() {
               onTopicsChange={setNTopics}
               onClustersChange={setNClusters}
               optimalTopics={coherenceData?.optimal_topics}
-              optimalClusters={clusterMetricsData?.elbow_point ?? undefined}
+              optimalClusters={(algorithm === "kmeans"
+                ? clusterMetricsData?.elbow_point
+                : gmmMetricsData?.optimal_bic) ?? undefined}
               minTopics={minTopics}
               maxTopics={maxTopics}
               minClusters={minClusters}
               maxClusters={maxClusters}
+              algorithm={algorithm}
+              onAlgorithmChange={setAlgorithm}
+              covarianceType={covarianceType}
+              onCovarianceTypeChange={setCovarianceType}
             />
           )}
         </div>
@@ -223,11 +245,17 @@ export function Dashboard() {
                 onTopicsChange={setNTopics}
                 onClustersChange={setNClusters}
                 optimalTopics={coherenceData?.optimal_topics}
-                optimalClusters={clusterMetricsData?.elbow_point ?? undefined}
+                optimalClusters={(algorithm === "kmeans"
+                  ? clusterMetricsData?.elbow_point
+                  : gmmMetricsData?.optimal_bic) ?? undefined}
                 minTopics={minTopics}
                 maxTopics={maxTopics}
                 minClusters={minClusters}
                 maxClusters={maxClusters}
+                algorithm={algorithm}
+                onAlgorithmChange={setAlgorithm}
+                covarianceType={covarianceType}
+                onCovarianceTypeChange={setCovarianceType}
               />
             )}
           </div>
@@ -271,22 +299,33 @@ export function Dashboard() {
               />
             </div>
             <div className="animate-slide-up delay-5">
-              <ClusterMetricsChart
-                data={clusterMetricsData}
-                loading={clusterMetricsLoading}
-                isValidating={clusterMetricsValidating}
-                selectedClusters={nClusters}
-                onSelectClusters={setNClusters}
-              />
+              {algorithm === "kmeans" ? (
+                <ClusterMetricsChart
+                  data={clusterMetricsData}
+                  loading={clusterMetricsLoading}
+                  isValidating={clusterMetricsValidating}
+                  selectedClusters={nClusters}
+                  onSelectClusters={setNClusters}
+                />
+              ) : (
+                <GMMMetricsChart
+                  data={gmmMetricsData}
+                  loading={gmmMetricsLoading}
+                  isValidating={gmmMetricsValidating}
+                  selectedClusters={nClusters}
+                  onSelectClusters={setNClusters}
+                />
+              )}
             </div>
           </div>
 
           {/* Scatter plot */}
           <div className="mb-6 animate-fade-in">
             <ScatterPlot
-              data={visualizationData}
-              loading={visualizationLoading}
-              isValidating={visualizationValidating}
+              data={algorithm === "kmeans" ? visualizationData : gmmVisualizationData}
+              loading={algorithm === "kmeans" ? visualizationLoading : gmmVisualizationLoading}
+              isValidating={algorithm === "kmeans" ? visualizationValidating : gmmVisualizationValidating}
+              algorithm={algorithm}
             />
           </div>
 

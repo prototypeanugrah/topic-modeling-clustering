@@ -7,8 +7,8 @@ from backend.config import (
     UMAP_N_NEIGHBORS,
     UMAP_MIN_DIST,
     UMAP_N_COMPONENTS,
-    UMAP_RANDOM_STATE,
 )
+from backend.core.random_seed import get_random_state
 
 
 def compute_umap(
@@ -16,7 +16,7 @@ def compute_umap(
     n_neighbors: int = UMAP_N_NEIGHBORS,
     min_dist: float = UMAP_MIN_DIST,
     n_components: int = UMAP_N_COMPONENTS,
-    random_state: int = UMAP_RANDOM_STATE,
+    random_state: int | None = None,
 ) -> np.ndarray:
     """
     Compute UMAP projection for visualization.
@@ -35,7 +35,7 @@ def compute_umap(
         n_neighbors=n_neighbors,
         min_dist=min_dist,
         n_components=n_components,
-        random_state=random_state,
+        random_state=random_state if random_state is not None else get_random_state(),
         metric="cosine",  # Good for topic distributions
     )
     return reducer.fit_transform(data)

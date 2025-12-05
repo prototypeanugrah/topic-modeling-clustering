@@ -22,21 +22,23 @@ MAX_TOPICS = 20
 LDA_PASSES = 10
 LDA_ITERATIONS = 5000
 LDA_CHUNKSIZE = 11000
-LDA_RANDOM_STATE = 42
 LDA_ALPHA = "auto"  # Document-topic density ('auto', 'symmetric', or float)
 LDA_ETA = "auto"  # Topic-word density ('auto', 'symmetric', or float)
 
 # Clustering settings
 MIN_CLUSTERS = 2
 MAX_CLUSTERS = 15
-KMEANS_RANDOM_STATE = 42
 KMEANS_N_INIT = 10
+
+# GMM settings
+GMM_N_INIT = 10
+GMM_MAX_ITER = 100
+GMM_COVARIANCE_TYPES = ["full", "diag", "spherical"]
 
 # UMAP settings
 UMAP_N_NEIGHBORS = 15
 UMAP_MIN_DIST = 0.1
 UMAP_N_COMPONENTS = 2
-UMAP_RANDOM_STATE = 42
 
 # Preprocessing settings
 MIN_TOKEN_LENGTH = 3

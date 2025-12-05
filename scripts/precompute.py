@@ -30,6 +30,8 @@ from backend.cache.manager import (
     load_cluster_metrics,
     load_cluster_labels,
     load_document_enrichment,
+    load_gmm_metrics,
+    load_gmm_labels,
     save_coherence_scores,
     save_corpus,
     save_dictionary,
@@ -42,10 +44,16 @@ from backend.cache.manager import (
     save_cluster_metrics,
     save_cluster_labels,
     save_document_enrichment,
+    save_gmm_metrics,
+    save_gmm_labels,
+    save_gmm_probabilities,
 )
-from backend.config import MAX_TOPICS, MIN_TOPICS, MIN_CLUSTERS, MAX_CLUSTERS
+from backend.config import MAX_TOPICS, MIN_TOPICS, MIN_CLUSTERS, MAX_CLUSTERS, GMM_COVARIANCE_TYPES
 from backend.core.clustering import perform_kmeans
+from backend.core.gmm import perform_gmm
 from backend.core.metrics import compute_metrics_for_all_clusters
+from backend.core.gmm_metrics import compute_gmm_metrics_for_all_clusters
+from backend.core.random_seed import set_random_seed
 from backend.core.data_loader import load_all_data
 from backend.core.lda_trainer import (
     calculate_coherence,
@@ -86,6 +94,9 @@ def parse_args():
 def main():
     """Run the full precomputation pipeline."""
     args = parse_args()
+
+    # Set random seed for reproducibility
+    set_random_seed()
 
     min_topics = args.min_topics
     max_topics = args.max_topics
@@ -430,6 +441,77 @@ def main():
         enrichment_computed += 1
 
     print(f"      Document enrichment - Computed: {enrichment_computed}, Skipped: {enrichment_skipped}")
+
+    # =========================================================================
+    # STEP 10: Precompute GMM Metrics (for all covariance types)
+    # =========================================================================
+
+    print("\n[10/11] Precomputing GMM metrics...")
+    gmm_metrics_computed = 0
+    gmm_metrics_skipped = 0
+
+    for num_topics in range(min_topics, max_topics + 1):
+        distribution = load_doc_topic_distribution(num_topics)
+        if distribution is None:
+            print(f"      Warning: Distribution k={num_topics} not found, skipping")
+            continue
+
+        for cov_type in GMM_COVARIANCE_TYPES:
+            existing = load_gmm_metrics(num_topics, cov_type)
+            if existing is not None and not args.force:
+                gmm_metrics_skipped += 1
+                continue
+
+            step_start = time.time()
+            print(f"      k={num_topics}, cov={cov_type}...", end=" ", flush=True)
+
+            metrics = compute_gmm_metrics_for_all_clusters(
+                distribution, covariance_type=cov_type
+            )
+
+            save_gmm_metrics({
+                "n_topics": num_topics,
+                "covariance_type": cov_type,
+                "cluster_counts": metrics["cluster_counts"],
+                "silhouette_scores": [round(float(s), 6) for s in metrics["silhouette_scores"]],
+                "bic_scores": [round(float(b), 2) for b in metrics["bic_scores"]],
+                "aic_scores": [round(float(a), 2) for a in metrics["aic_scores"]],
+                "optimal_bic": metrics["optimal_bic"],
+                "optimal_aic": metrics["optimal_aic"],
+            }, num_topics, cov_type)
+
+            elapsed = time.time() - step_start
+            print(f"({elapsed:.1f}s)")
+            gmm_metrics_computed += 1
+
+    print(f"      GMM metrics - Computed: {gmm_metrics_computed}, Skipped: {gmm_metrics_skipped}")
+
+    # =========================================================================
+    # STEP 11: Precompute GMM Labels & Probabilities
+    # =========================================================================
+
+    print("\n[11/11] Precomputing GMM labels and probabilities...")
+    gmm_labels_computed = 0
+    gmm_labels_skipped = 0
+
+    for num_topics in range(min_topics, max_topics + 1):
+        distribution = load_doc_topic_distribution(num_topics)
+        if distribution is None:
+            continue
+
+        for cov_type in GMM_COVARIANCE_TYPES:
+            for n_clusters in range(MIN_CLUSTERS, MAX_CLUSTERS + 1):
+                existing = load_gmm_labels(num_topics, n_clusters, cov_type)
+                if existing is not None and not args.force:
+                    gmm_labels_skipped += 1
+                    continue
+
+                result = perform_gmm(distribution, n_clusters, covariance_type=cov_type)
+                save_gmm_labels(result.labels, num_topics, n_clusters, cov_type)
+                save_gmm_probabilities(result.probabilities, num_topics, n_clusters, cov_type)
+                gmm_labels_computed += 1
+
+    print(f"      GMM labels/probs - Computed: {gmm_labels_computed}, Skipped: {gmm_labels_skipped}")
 
     # =========================================================================
     # Summary

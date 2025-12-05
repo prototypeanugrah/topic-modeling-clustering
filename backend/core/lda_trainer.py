@@ -15,8 +15,8 @@ from backend.config import (
     LDA_ETA,
     LDA_ITERATIONS,
     LDA_PASSES,
-    LDA_RANDOM_STATE,
 )
+from backend.core.random_seed import get_random_state
 
 
 class LDAResult(NamedTuple):
@@ -71,7 +71,7 @@ def train_lda(
     passes: int = LDA_PASSES,
     iterations: int = LDA_ITERATIONS,
     chunksize: int = LDA_CHUNKSIZE,
-    random_state: int = LDA_RANDOM_STATE,
+    random_state: int | None = None,
     alpha: str | float | list[float] = LDA_ALPHA,
     eta: str | float | list[float] = LDA_ETA,
 ) -> LdaModel:
@@ -99,7 +99,7 @@ def train_lda(
         passes=passes,
         iterations=iterations,
         chunksize=chunksize,
-        random_state=random_state,
+        random_state=random_state if random_state is not None else get_random_state(),
         alpha=alpha,
         eta=eta,
         per_word_topics=False,
