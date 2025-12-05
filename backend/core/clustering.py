@@ -4,7 +4,8 @@ import numpy as np
 from sklearn.cluster import KMeans
 from typing import NamedTuple
 
-from backend.config import KMEANS_RANDOM_STATE, KMEANS_N_INIT
+from backend.config import KMEANS_N_INIT
+from backend.core.random_seed import get_random_state
 
 
 class ClusteringResult(NamedTuple):
@@ -17,7 +18,7 @@ class ClusteringResult(NamedTuple):
 def perform_kmeans(
     data: np.ndarray,
     n_clusters: int,
-    random_state: int = KMEANS_RANDOM_STATE,
+    random_state: int | None = None,
     n_init: int = KMEANS_N_INIT,
 ) -> ClusteringResult:
     """
@@ -34,7 +35,7 @@ def perform_kmeans(
     """
     kmeans = KMeans(
         n_clusters=n_clusters,
-        random_state=random_state,
+        random_state=random_state if random_state is not None else get_random_state(),
         n_init=n_init,
     )
     labels = kmeans.fit_predict(data)

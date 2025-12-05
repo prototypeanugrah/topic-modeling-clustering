@@ -91,6 +91,10 @@ class ClusteredVisualizationResponse(BaseModel):
     cluster_labels: list[int]
     document_ids: list[int]
 
+    # Cluster geometry for boundary visualization
+    cluster_centers: Optional[list[list[float]]] = None  # [[x, y], ...] per cluster
+    cluster_covariances: Optional[list[list[list[float]]]] = None  # [[[a,b],[c,d]], ...] 2x2 per cluster
+
     # Optional enrichment fields for tooltip
     newsgroup_labels: Optional[list[str]] = None  # Original 20 newsgroups labels
     top_topics: Optional[list[list[DocumentTopicInfo]]] = None  # Top 3 topics per doc
@@ -165,3 +169,68 @@ class BoxPlotData(BaseModel):
 
     # Token counts by newsgroup category
     category_token_counts: dict[str, list[int]]  # {"alt.atheism": [...], "comp.graphics": [...], ...}
+
+
+# === GMM Response Models ===
+
+
+class ClusterProbability(BaseModel):
+    """Probability assignment for a single cluster."""
+
+    cluster_id: int
+    probability: float
+
+
+class GMMResponse(BaseModel):
+    """Response for GMM clustering endpoint."""
+
+    n_topics: int
+    n_clusters: int
+    covariance_type: str
+    labels: list[int]
+    probabilities: list[list[ClusterProbability]]  # Top 3 soft assignments per document
+    bic: float
+    aic: float
+    cluster_sizes: list[int]
+
+
+class GMMMetricsResponse(BaseModel):
+    """Response for GMM metrics endpoint."""
+
+    n_topics: int
+    covariance_type: str
+    cluster_counts: list[int]
+    bic_scores: list[float]
+    aic_scores: list[float]
+    optimal_bic: int  # Cluster count with minimum BIC
+    optimal_aic: int  # Cluster count with minimum AIC
+
+
+class GMMAllCovarianceMetricsResponse(BaseModel):
+    """Response for GMM metrics across all covariance types."""
+
+    n_topics: int
+    full: GMMMetricsResponse
+    diag: GMMMetricsResponse
+    spherical: GMMMetricsResponse
+
+
+class GMMClusteredVisualizationResponse(BaseModel):
+    """Response for GMM clustered visualization endpoint."""
+
+    n_topics: int
+    n_clusters: int
+    covariance_type: str
+    projections: list[list[float]]  # [[x, y], ...]
+    cluster_labels: list[int]
+    cluster_probabilities: list[list[ClusterProbability]]  # Top 3 per document
+    document_ids: list[int]
+
+    # Cluster geometry for ellipse visualization (in UMAP 2D space)
+    cluster_means: Optional[list[list[float]]] = None  # [[x, y], ...] per cluster
+    cluster_covariances: Optional[list[list[list[float]]]] = None  # [[[a,b],[c,d]], ...] 2x2 per cluster
+
+    # Optional enrichment fields for tooltip
+    newsgroup_labels: Optional[list[str]] = None
+    top_topics: Optional[list[list[DocumentTopicInfo]]] = None
+    dominant_topic_words: Optional[list[list[str]]] = None

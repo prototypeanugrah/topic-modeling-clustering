@@ -1,5 +1,8 @@
 import { TopicSlider } from "./TopicSlider";
 import { ClusterSlider } from "./ClusterSlider";
+import { AlgorithmToggle, type Algorithm } from "./AlgorithmToggle";
+import { CovarianceSelector } from "./CovarianceSelector";
+import type { CovarianceType } from "../../types/api";
 
 interface ControlPanelProps {
   nTopics: number;
@@ -12,6 +15,11 @@ interface ControlPanelProps {
   maxTopics?: number;
   minClusters?: number;
   maxClusters?: number;
+  // New GMM props
+  algorithm?: Algorithm;
+  onAlgorithmChange?: (value: Algorithm) => void;
+  covarianceType?: CovarianceType;
+  onCovarianceTypeChange?: (value: CovarianceType) => void;
 }
 
 export function ControlPanel({
@@ -25,6 +33,10 @@ export function ControlPanel({
   maxTopics = 20,
   minClusters = 2,
   maxClusters = 15,
+  algorithm = "kmeans",
+  onAlgorithmChange,
+  covarianceType = "full",
+  onCovarianceTypeChange,
 }: ControlPanelProps) {
   return (
     <div
@@ -47,6 +59,14 @@ export function ControlPanel({
           optimalValue={optimalTopics}
         />
 
+        {onAlgorithmChange && (
+          <AlgorithmToggle value={algorithm} onChange={onAlgorithmChange} />
+        )}
+
+        {algorithm === "gmm" && onCovarianceTypeChange && (
+          <CovarianceSelector value={covarianceType} onChange={onCovarianceTypeChange} />
+        )}
+
         <ClusterSlider
           value={nClusters}
           onChange={onClustersChange}
@@ -58,3 +78,6 @@ export function ControlPanel({
     </div>
   );
 }
+
+export { AlgorithmToggle, type Algorithm } from "./AlgorithmToggle";
+export { CovarianceSelector } from "./CovarianceSelector";

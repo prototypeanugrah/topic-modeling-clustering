@@ -158,6 +158,35 @@ export const api = {
   // EDA
   getEDA: () => fetchApi<import("../types/api").EDAResponse>("/eda"),
 
+  // GMM Clustering
+  gmmCluster: (request: import("../types/api").GMMRequest) =>
+    fetchApi<import("../types/api").GMMResponse>("/gmm", {
+      method: "POST",
+      body: JSON.stringify(request),
+    }),
+
+  getGMMMetrics: (
+    nTopics: number,
+    covarianceType: import("../types/api").CovarianceType = "full"
+  ) =>
+    fetchApi<import("../types/api").GMMMetricsResponse>(
+      `/gmm/metrics/${nTopics}?covariance_type=${covarianceType}`
+    ),
+
+  getGMMAllMetrics: (nTopics: number) =>
+    fetchApi<import("../types/api").GMMAllCovarianceMetricsResponse>(
+      `/gmm/metrics/all/${nTopics}`
+    ),
+
+  getGMMClusteredVisualization: (request: import("../types/api").GMMRequest) =>
+    fetchApi<import("../types/api").GMMClusteredVisualizationResponse>(
+      "/visualization/gmm-clustered",
+      {
+        method: "POST",
+        body: JSON.stringify(request),
+      }
+    ),
+
   // Prefetch helpers
   prefetch,
   prefetchPost,
